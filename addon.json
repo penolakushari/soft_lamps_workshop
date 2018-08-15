@@ -1,0 +1,9 @@
+{
+	"title"		:	"Soft Lamps",
+	"type"		:	"tool",
+	"tags"		:	[ "scenic", "realism" ],
+	"ignore"	:
+	[
+		".git/*"
+	]
+}
