@@ -77,7 +77,7 @@ hook.Add("CalcView", "OverrideCalcViewLS", OverrideCalcViewLS)
 
 local function DisplayScanGridLS()
 	local Ply = LocalPlayer()
-	if !Ply.ShouldDisplayLSGrid then return false end
+	if !Ply.ShouldDisplayLSGrid then return end
 	if Ply:GetActiveWeapon().Mode == "light_sprayer" then
 		if Ply:KeyDown(IN_RELOAD) then
 			local Tool = Ply:GetTool()
@@ -148,7 +148,7 @@ local PlaneSize = 3000
 local PlaneColor = Color(0, 0, 0, 255)
 local function DisplayDistancePlaneLS()
 	local Ply = LocalPlayer()
-	if !Ply.ShouldDisplayLSGrid then return false end
+	if !Ply.ShouldDisplayLSGrid then return end
 	if Ply:GetActiveWeapon().Mode == "light_sprayer" then
 		if Ply:KeyDown(IN_RELOAD) and !Ply:KeyPressed(IN_ATTACK) then
 			local Tool = Ply:GetTool()
