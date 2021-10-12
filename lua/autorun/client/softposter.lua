@@ -194,7 +194,6 @@ function SingleRender(ent, progressbardata, fuckshit, camstarter)
 
 	-- render.Clear(1, 1, 1, 255)
 
-
 	DrawColorModify(colormod)	-- all pixels are either 0 or 255 (R=G=B)
 	DrawColorModify(colormod2)	-- all pixels are either 0 or 1
 	render.UpdateScreenEffectTexture()
@@ -683,7 +682,7 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 				for s = 1, lightpasses do
 					if (lightsize/s > 5) then
 						for a, pt in pairs(PTs) do
-							pt:SetColor(Color(255, 255, 255))
+							pt:SetColor(bounce.Col)
 							pt:SetPos(bounce.Pos)
 							pt:SetFarZ(lightsize/s)
 							pt:Update()
