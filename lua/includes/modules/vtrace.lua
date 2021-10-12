@@ -33,7 +33,7 @@ local MaxPixelsCount = 4000
 if SERVER then
 	net.Receive("FinalizeServer", function()
 		local Scanner = ents.FindByClass("vtrace_scanner")[1]
-
+	
 		local ExpectingCallback = net.ReadBool()
 
 		if ExpectingCallback then
@@ -54,7 +54,7 @@ if SERVER then
 				VTracePoolTable[CallbackID] = nil
 			end
 		end
-
+		
 		Scanner.Slave:SetViewEntity(Scanner.Slave)
 
 		--Clean scanner
@@ -111,7 +111,7 @@ local function FinalizeClient()
 
 	if RanByClient then
 		PerformCallback(CallbackID, PixelsTable)
-
+		
 		FinalizeServer()
 
 		RunAgain()
@@ -159,7 +159,7 @@ local function CalculatePositions()
 	local PixelsTable = Scanner.PixelsTable
 
 	LocalPlayer():SetFOV(Scanner.FOV, 0)
-
+	
 	local ScannerAng = Scanner:GetAngles()
 	local ScannerPos = Scanner:GetPos()
 	local ScannerNormal = ScannerAng:Forward()
@@ -167,7 +167,7 @@ local function CalculatePositions()
 	local NearZ = Scanner.NearZ
 	local FarZ = Scanner.FarZ
 	local PositionOffset = Scanner.PositionOffset
-
+	
 
 	local ZPlaneSize = 3000
 	local ZPlaneColor = Color(255, 255, 255, 255)
@@ -175,7 +175,7 @@ local function CalculatePositions()
 	local ZPlaneOffset = ScannerNormal*math.max(NearZ, 20)
 
 	local Count = 0
-
+	
 	render.RenderView()
 	render.Clear(0, 0, 0, 255, false, true)
 
@@ -183,7 +183,7 @@ local function CalculatePositions()
 	local ZPlanePos = ScannerPos + ScannerNormal*AccuracyTolerance + ZPlaneOffset
 	local PixelsToHit = table.Count(PixelsTable)
 	while ZPlanePos:Distance(ScannerPos) < FarZ and PixelsToHit > 0 do
-
+		
 
 		render.RenderView()
 		render.Clear(0, 0, 0, 0, false, true)
@@ -222,7 +222,7 @@ local function CalculatePositions()
 		end
 
 		ZPlanePos = ZPlanePos + ScannerNormal*AccuracyTolerance
-
+		
 		render.Spin() -- Let the client see what's going on
 
 	end
@@ -259,7 +259,7 @@ local function VTraceOverrideCalcView()
 
 		local ViewOverride = {}
 		local Scanner = ents.FindByClass("vtrace_scanner")[1]
-
+		
 		ViewOverride.fov = Scanner.FOV
 		ViewOverride.zfar = Scanner.FarZ + 1
 		ViewOverride.znear = Scanner.NearZ
@@ -353,7 +353,7 @@ local function InitializeClient(ClientData)
 	local RanByClient = ClientData.RanByClient
 	local CallbackID = ClientData.CallbackID
 	local PixelsTable = CreatePixelsTable(ScanRadius, ScanInterval, ScanJitter, EntireScreen)
-
+	
 	--Find scanner and set view
 	local Scanner = ents.FindByClass("vtrace_scanner")[1]
 	local Slave = LocalPlayer()
@@ -392,7 +392,7 @@ function StartVTrace(ClientData)
 	local Slave = ClientData.Slave
 	Scanner.Slave = Slave
 	Slave:SetViewEntity(Scanner)
-
+	
 	net.Start("InitializeClient")
 		net.WriteTable(ClientData)
 	net.Send(Slave)

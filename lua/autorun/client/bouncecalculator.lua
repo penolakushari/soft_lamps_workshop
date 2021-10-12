@@ -289,6 +289,7 @@ concommand.Add("lightbounce_debug",function(Ply, Cmd, Args)
 	end
 end)
 
+local spriteSize = 15
 local Mat = Material("vgui/circle")
 hook.Add("HUDPaint", "Show Debug", function()
 	if ShowDebug then
@@ -298,10 +299,16 @@ hook.Add("HUDPaint", "Show Debug", function()
 			for SoftLamp, BounceData in pairs (SoftLampsBounceTable) do
 				for Pix, PixTable in pairs (BounceData) do
 					render.SetMaterial(Mat)
-					render.DrawSprite(PixTable.Pos, 15, 15, PixTable.Col)
+					render.DrawSprite(PixTable.Pos, spriteSize, spriteSize, PixTable.Col)
 				end
 			end
 
 		cam.End3D()
+	end
+end)
+
+concommand.Add("lightbounce_debug_size",function(Ply, Cmd, Args)
+	if isnumber(Args[1]) then
+		spriteSize = Args[1]
 	end
 end)

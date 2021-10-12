@@ -184,7 +184,8 @@ local colormod2 = {
 function SingleRender(ent, progressbardata, fuckshit, camstarter)
 	renders = renders + 1
 
-	if renders == 1 or fuckshit then RenderZBuffer() end	-- render depth buffer on first render
+	//if renders == 1 or fuckshit then RenderZBuffer() end	-- render depth buffer on first render
+	RenderZBuffer()
 
 	cam.Start(camstarter)
 		render.Clear(0, 0, 0, 255, false, true)
@@ -192,6 +193,7 @@ function SingleRender(ent, progressbardata, fuckshit, camstarter)
 	cam.End()
 
 	-- render.Clear(1, 1, 1, 255)
+
 
 	DrawColorModify(colormod)	-- all pixels are either 0 or 255 (R=G=B)
 	DrawColorModify(colormod2)	-- all pixels are either 0 or 1
@@ -311,7 +313,7 @@ concommand.Add("poster_darken", function(ply, cmd, args)
 	print("Darken set to "..args[1].."!")
 end)
 
-
+local lastRT
 local function FinishRender()
 	-- Divide the sum of the additive renders by the number of renders to get an average, blended result
 	local someparameter = 2100 -- the higher the darker
@@ -319,8 +321,9 @@ local function FinishRender()
 	local rt = planes and tex_blendint or tex_blend
 	rt = tex_blend
 
-	if additive then mul = 1 end
+	lastRT = rt
 
+	if additive then mul = 1 end
 
 	mul = mul / darken
 
@@ -348,6 +351,36 @@ local function FinishRender()
 	-- let the render end naturally
 end
 
+local function ReFinishRender(postermul, split)
+	
+	mul = (planes and 1 or 1) / (planes and someparameter or renders)
+
+	if additive then mul = 1 end
+
+	mul = mul / darken
+
+	rt = tex_blend
+	lastRT = rt
+	render.PushRenderTarget(lastRT)
+		mat_divide:SetTexture("$fbtexture", lastRT)
+		mat_divide:SetFloat("$pp_colour_contrast", mul)
+		render.SetMaterial(mat_divide)
+		render.DrawScreenQuad()
+	render.PopRenderTarget()
+
+	mat_copy:SetTexture("$basetexture", lastRT)
+	render.SetMaterial(mat_copy)
+
+	render.DrawScreenQuad()
+	render.DrawScreenQuad()
+
+	RunConsoleCommand("poster", postermul, split)
+end
+concommand.Add("poster_redo", function(ply, cmd, args)
+	local postermul = args[1]
+	ReFinishRender(postermul)
+end)
+
 
 local function SoftPoster(postermul, split)
 	local extra = extraframes:GetInt()
@@ -359,6 +392,7 @@ local function SoftPoster(postermul, split)
 
 	local lightcount = 0
 	for k, lamp in pairs(softlamps) do
+		if !lamp:GetHeavyOn() then continue end
 		local c = lamp:HeavyLightCount()
 		lightcount = lightcount + c
 		lights[lamp] = c
@@ -625,6 +659,11 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 		pt:SetNearZ(GlobalNearZ)
 		pt:SetFarZ(lightsize + 0)	// +0 to convert from string to number
 		pt:SetFOV(98.5)	-- works well with effects/flashlight/square IIRC
+
+		-- Set proper attenuation
+		pt:SetConstantAttenuation(0)
+		pt:SetLinearAttenuation(0)
+		pt:SetQuadraticAttenuation(lightsize)
 	end
 
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
@@ -644,7 +683,7 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 				for s = 1, lightpasses do
 					if (lightsize/s > 5) then
 						for a, pt in pairs(PTs) do
-							pt:SetColor(bounce.Col)
+							pt:SetColor(Color(255, 255, 255))
 							pt:SetPos(bounce.Pos)
 							pt:SetFarZ(lightsize/s)
 							pt:Update()
