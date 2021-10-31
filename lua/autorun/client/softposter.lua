@@ -351,7 +351,7 @@ local function FinishRender()
 end
 
 local function ReFinishRender(postermul, split)
-	
+
 	mul = (planes and 1 or 1) / (planes and someparameter or renders)
 
 	if additive then mul = 1 end

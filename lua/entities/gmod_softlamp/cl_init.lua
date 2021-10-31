@@ -116,7 +116,7 @@ function ENT:HeavyLightTick()
 	end
 
 	if IsValid(self.HeavyLightVLPlane) then
-		
+
 		local fov = self:GetLightFOV() / 2
 		local min = 1
 		local max = self.HeavyLightVLPlaneMax

@@ -17,7 +17,7 @@ end
 local MinLight = 5
 
 function TOOL:LeftClick(Trace)
-		
+
 	local Ply = self:GetOwner()
 	// ("lightspray_calculate <FOV> <Accuracy> <Scan Radius> <Interval> <Scan Jitter> <Position Offset> <Start Distance> <End Distance>")
 	if SERVER then
@@ -60,7 +60,7 @@ local function OverrideCalcViewLS()
 
 				local Tool = Ply:GetTool()
 				local ViewOverride = {}
-				
+
 				ViewOverride.fov = Tool:GetClientNumber("scan_fov")
 				ViewOverride.zfar = Tool:GetClientNumber("scan_farz") + 2
 				ViewOverride.znear = Tool:GetClientNumber("scan_nearz")
@@ -223,9 +223,9 @@ TOOL.ClientConVar[ "gridcol_a" ] = 255
 
 --Button, TextBox, Header, Slider
 function TOOL.BuildCPanel(CPanel)
-	
+
 	LocalPlayer().ShouldDisplayLSGrid = true
-	
+
 	CPanel:AddControl( "Header", { Description	= "Sprayer Settings"} )
 	CPanel:AddControl( "Button", { Label = "Reset All Settings", Command = "light_sprayer_resetallconvars", Text = "Reset All Settings" } )
 

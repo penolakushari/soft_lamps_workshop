@@ -45,7 +45,7 @@ function ENT:Think()
 		self:Remove()
 		return BaseClass.Think(self)
 	end
-	
+
 	self.shape = self:GetHeavyShape()
 	self.radius = self:GetShapeRadius()
 	self.layers = self:GetGameplayLayers()
@@ -53,7 +53,7 @@ function ENT:Think()
 	self.fov = self:GetLightFOV()
 	self.distance = self:GetDistance()
 	self.nearz = self:GetNearZ()
-	
+
 	local col = self:GetLightColor():ToColor()
 	self.r = col.r
 	self.g = col.g

@@ -50,11 +50,11 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 										}
 
 					vtrace.DoTrace(TraceTable, function(BounceData)
-						
+
 						SoftLamp:SetNoDraw(false)
 
 						for Pix, PixTable in pairs(BounceData) do
-							
+
 							local Col = PixTable.PixelColor
 							local Pos = PixTable.PixelPosition
 							local Dir = PixTable.PixelDirection
@@ -73,7 +73,7 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 						end
 
 						table.Add(SoftLampsBounceTable[SoftLamp], BounceData)
-						
+
 						local Count = 0
 						for Pix, PixTable in pairs(BounceData) do
 							Count = Count + 1
@@ -160,7 +160,7 @@ concommand.Add("lightspray_calculate", function(Ply, Cmd, Args)
 			Ply:SetNoDraw(false)
 
 			for Pix, PixTable in pairs(BounceData) do
-				
+
 				local Col = PixTable.PixelColor
 				local Pos = PixTable.PixelPosition
 
@@ -177,7 +177,7 @@ concommand.Add("lightspray_calculate", function(Ply, Cmd, Args)
 			end
 
 			SoftLampsBounceTable[table.Count(SoftLampsBounceTable)+1] = BounceData
-			
+
 			local Count = 0
 			for Pix, PixTable in pairs(BounceData) do
 				Count = Count + 1
@@ -190,7 +190,7 @@ concommand.Add("lightspray_calculate", function(Ply, Cmd, Args)
 end)
 
 concommand.Add("lightspray_calculate_advanced", function(Ply, Cmd, Args)
-	
+
 	local draweffectrings = GetConVar("cl_draweffectrings"):GetInt()
 	if draweffectrings == 1 then
 		print("cl_draweffectrings is "..draweffectrings.." ! Set it to 0!")
@@ -223,7 +223,7 @@ concommand.Add("lightspray_calculate_advanced", function(Ply, Cmd, Args)
 			Ply:SetNoDraw(false)
 
 			for Pix, PixTable in pairs(BounceData) do
-				
+
 				local Col = PixTable.PixelColor
 				local Pos = PixTable.PixelPosition
 
@@ -240,7 +240,7 @@ concommand.Add("lightspray_calculate_advanced", function(Ply, Cmd, Args)
 			end
 
 			SoftLampsBounceTable[table.Count(SoftLampsBounceTable)+1] = BounceData
-			
+
 			local Count = 0
 			for Pix, PixTable in pairs(BounceData) do
 				Count = Count + 1
@@ -260,7 +260,7 @@ concommand.Add("reflection_fidelity_helper",function(Ply, Cmd, Args)
 			print("Fidelity must be within 0-1 range. Clamping.")
 			print("")
 		end
-		
+
 		local Interval = math.Round(25 - 25*F, 0)
 		local Boost = 0.5 + 40*F
 		local Exponent = 10 + 49990*(F^2)

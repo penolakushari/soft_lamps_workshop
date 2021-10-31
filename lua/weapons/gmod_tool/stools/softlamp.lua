@@ -354,7 +354,7 @@ function TOOL.BuildCPanel( CPanel )
 	local shapecvar = GetConVar("softlamp_shape")
 	local radiuscvar = GetConVar("softlamp_radius")
 	local layerscvar = GetConVar("softlamp_layers")
-	
+
 	local oldthink = countnumber.Think
 	function countnumber:Think(...)
 		local ret = oldthink(self, ...)

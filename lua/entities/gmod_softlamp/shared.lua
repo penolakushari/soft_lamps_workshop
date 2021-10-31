@@ -88,7 +88,7 @@ function ENT:GetVecs(heavy, world)
 			vecs._shape = shape
 			vecs._radius = radius
 			vecs._layers = layers
-			
+
 			self.HeavyVecs = vecs
 			self.HeavyVecsDirty = false
 
@@ -100,7 +100,7 @@ function ENT:GetVecs(heavy, world)
 			local layers = self:GetGameplayLayers()
 
 			vecs = vectorshapes.MakeShape(shape, radius, layers)
-			
+
 			-- Limit to a max of 8 lights for performance reasons to not crash the game:
 			local l = layers
 			while #vecs.all > 8 and l > 2 do
@@ -125,7 +125,7 @@ function ENT:GetVecs(heavy, world)
 		vecs.positions = {}
 		for k, v in pairs(vecs.all) do
 			vecs.positions[k] = {}
-			
+
 			if focaldist > 0 then
 				vecs.positions[k].ang = (focalpoint - v):Angle()
 			else
