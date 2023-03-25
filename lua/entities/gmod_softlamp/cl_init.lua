@@ -65,6 +65,7 @@ function ENT:HeavyLightStart(brightness, vlplanecount)
 	self.HeavyLightPT:SetNearZ(self:GetNearZ())
 	self.HeavyLightPT:SetFarZ(self:GetFarZ())
 	self.HeavyLightPT:SetFOV(self:GetLightFOV())
+	self.HeavyLightPT:SetOrthographic(self:GetEnableOrthographic(), self:GetOrthoLeft(), self:GetOrthoTop(), self:GetOrthoRight(), self:GetOrthoBottom())
 	self.HeavyLightPT:SetColor(self:GetLightColor():ToColor())
 	self.HeavyLightPT:SetBrightness(brightness)	-- brightness is dictated from outside
 
@@ -170,6 +171,7 @@ function ENT:Think()
 	local nearz = self:GetNearZ()
 	local farz = self:GetFarZ()
 	local fov = self:GetLightFOV()
+	local orton, ortleft, orttop, ortright, ortbot = self:GetEnableOrthographic(), self:GetOrthoLeft(), self:GetOrthoTop(), self:GetOrthoRight(), self:GetOrthoBottom()
 	local tex = self:GetFlashlightTexture()
 	local b = self:GetBrightness() / table.Count(self.Flashlights)	-- total sum of lights' brightness should equal requested brightness
 	local c = self:GetLightColor():ToColor()	-- convert vector to color structure
@@ -179,6 +181,7 @@ function ENT:Think()
 		pt:SetNearZ(nearz)
 		pt:SetFarZ(farz)
 		pt:SetFOV(fov)
+		pt:SetOrthographic(orton, ortleft, orttop, ortright, ortbot)
 		pt:SetColor(c)
 		pt:SetBrightness(b)
 

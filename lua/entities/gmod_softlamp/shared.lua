@@ -22,15 +22,22 @@ function ENT:SetupDataTables()
 
 	-- Lamp
 	self:NetworkVar("Bool",   0, "Toggle")
-	self:NetworkVar("Vector", 0, "LightOffset",   { KeyName = "lightoffset", Edit = { order = orderer(), category = "Lamp", type = "Generic",     title = "Offset" } })
-	self:NetworkVar("Vector", 1, "LightColor",    { KeyName = "lightcolor",  Edit = { order = orderer(), category = "Lamp", type = "VectorColor", title = "Color" } })
-	self:NetworkVar("Float",  0, "Brightness",    { KeyName = "brightness",  Edit = { order = orderer(), category = "Lamp", type = "Float",       title = "Brightness", min = 0, max = 1000 } })
-	self:NetworkVar("Float",  1, "LightFOV",      { KeyName = "fov",         Edit = { order = orderer(), category = "Lamp", type = "Float",       title = "FOV", min = 0, max = 180 } })
-	self:NetworkVar("Float",  2, "NearZ",         { KeyName = "nearz",       Edit = { order = orderer(), category = "Lamp", type = "Float",       title = "NearZ", min = 1, max = 1048576 } })
-	self:NetworkVar("Float",  3, "FarZ",          { KeyName = "farz",        Edit = { order = orderer(), category = "Lamp", type = "Float",       title = "FarZ",  min = 1, max = 1048576 } })
+	self:NetworkVar("Vector", 0, "LightOffset",       { KeyName = "lightoffset", Edit = { order = orderer(), category = "Lamp", type = "Generic",     title = "Offset" } })
+	self:NetworkVar("Vector", 1, "LightColor",        { KeyName = "lightcolor",  Edit = { order = orderer(), category = "Lamp", type = "VectorColor", title = "Color" } })
+	self:NetworkVar("Float",  0, "Brightness",        { KeyName = "brightness",  Edit = { order = orderer(), category = "Lamp", type = "Float",       title = "Brightness", min = 0, max = 1000 } })
+	self:NetworkVar("Float",  1, "LightFOV",          { KeyName = "fov",         Edit = { order = orderer(), category = "Lamp", type = "Float",       title = "FOV", min = 0, max = 180 } })
+	self:NetworkVar("Float",  2, "NearZ",             { KeyName = "nearz",       Edit = { order = orderer(), category = "Lamp", type = "Float",       title = "NearZ", min = 1, max = 1048576 } })
+	self:NetworkVar("Float",  3, "FarZ",              { KeyName = "farz",        Edit = { order = orderer(), category = "Lamp", type = "Float",       title = "FarZ",  min = 1, max = 1048576 } })
 	self:NetworkVar("Float",  3, "Distance")	-- temp, need to get rid of this
-	self:NetworkVar("Float",  6, "FocalDistance", { KeyName = "focal",       Edit = { order = orderer(), category = "Lamp", type = "Float",       title = "Focal Point Distance",  min = 0, max = 1048576 } })
-	self:NetworkVar("String", 0, "FlashlightTexture")
+	self:NetworkVar("Float",  6, "FocalDistance", 	  { KeyName = "focal",       Edit = { order = orderer(), category = "Lamp", type = "Float",       title = "Focal Point Distance",  min = 0, max = 1048576 } })
+	self:NetworkVar("String", 0, "FlashlightTexture", { KeyName = "texture", Edit = { order = orderer(), category = "Lamp", type = "Generic",     title = "Light Texture" } })
+
+	-- Orthographic
+	self:NetworkVar("Bool", 1, "EnableOrthographic", 	{ KeyName = "oon",			Edit = {order = orderer(), category = "Orthographic", type = "Boolean", 	title = "Enable Orthographic" } })
+	self:NetworkVar("Float", 5, "OrthoLeft", 			{ KeyName = "ortholeft",	Edit = {order = orderer(), category = "Orthographic", type = "Float", 	title = "Ortho Left", min = 0, max = 1048576 } })
+	self:NetworkVar("Float", 7, "OrthoTop", 			{ KeyName = "orthotop",		Edit = {order = orderer(), category = "Orthographic", type = "Float", 	title = "Ortho Top", min = 0, max = 1048576 } })
+	self:NetworkVar("Float", 8, "OrthoRight", 			{ KeyName = "orthoright",	Edit = {order = orderer(), category = "Orthographic", type = "Float",		title = "Ortho Right", min = 0, max = 1048576 } })
+	self:NetworkVar("Float", 9, "OrthoBottom", 			{ KeyName = "orthobottom",	Edit = {order = orderer(), category = "Orthographic", type = "Float", 	title = "Ortho Bottom", min = 0, max = 1048576 } })
 
 	local shapes = vectorshapes.GetShapes()
 	local combo = {}
@@ -39,7 +46,7 @@ function ENT:SetupDataTables()
 		combo[nicename] = k
 	end
 	-- HeavyLight
-	self:NetworkVar("Bool",   1, "HeavyOn",     { KeyName = "on",      Edit = { order = orderer(), category = "HeavyLight", type = "Boolean",     title = "On" } })
+	self:NetworkVar("Bool",   2, "HeavyOn",     { KeyName = "on",      Edit = { order = orderer(), category = "HeavyLight", type = "Boolean",     title = "On" } })
 	self:NetworkVar("String", 1, "HeavyShape",  { KeyName = "pshape",  Edit = { order = orderer(), category = "HeavyLight", type = "Combo", title = "Surface Shape", values = combo } })
 	self:NetworkVar("Float",  4, "ShapeRadius", { KeyName = "sradius", Edit = { order = orderer(), category = "HeavyLight", type = "Float", title = "Surface Radius", min = 1, max = 1048576 } })
 	self:NetworkVar("Int",    0, "HeavyLayers", { KeyName = "players", Edit = { order = orderer(), category = "HeavyLight", type = "Int",   title = "Surface Shape Resolution", min = 1, max = 200 } })
@@ -47,14 +54,14 @@ function ENT:SetupDataTables()
 	local combo2 = table.Copy(combo)
 	combo2["Same as above"] = ""
 	-- Gameplay
-	self:NetworkVar("Bool",   2, "On",             { KeyName = "pon",     Edit = { order = orderer(), category = "Gameplay", type = "Boolean", title = "On" } })
+	self:NetworkVar("Bool",   3, "On",             { KeyName = "pon",     Edit = { order = orderer(), category = "Gameplay", type = "Boolean", title = "On" } })
 	--self:NetworkVar("Float",  5, "Scroll",         { KeyName = "pon",     Edit = { order = orderer(), category = "Gameplay", type = "Float", title = "Scroll Speed (override gameplay shape)", min = 0, max = 60 } })
 	self:NetworkVar("String", 2, "GameplayShape",  { KeyName = "sshape",  Edit = { order = orderer(), category = "Gameplay", type = "Combo",  title = "Surface Shape", values = combo2, text = "Same as above" } })
 	self:NetworkVar("Int",    1, "GameplayLayers", { KeyName = "slayers", Edit = { order = orderer(), category = "Gameplay", type = "Int",   title = "Surface Shape Resolution", min = 1, max = 100 } })
 
 	-- Visualization
-	self:NetworkVar("Bool", 3, "PreviewPoster",   { KeyName = "previewposter",  Edit = { order = orderer(), category = "Visualization", type = "Combo", title = "Pick Target", values = { Gameplay = false, HeavyLight = true }, text = "Gameplay" } })
-	self:NetworkVar("Bool", 4, "PreviewPoints",   { KeyName = "previewpoints",  Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Light Sources" } })
+	self:NetworkVar("Bool", 4, "PreviewPoster",   { KeyName = "previewposter",  Edit = { order = orderer(), category = "Visualization", type = "Combo", title = "Pick Target", values = { Gameplay = false, HeavyLight = true }, text = "Gameplay" } })
+	self:NetworkVar("Bool", 5, "PreviewPoints",   { KeyName = "previewpoints",  Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Light Sources" } })
 	--self:NetworkVar("Bool", 5, "PreviewCone",     { KeyName = "previewcone",    Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Projection Cones" } })
 	self:NetworkVar("Bool", 6, "PreviewSafeArea", { KeyName = "previewsafe",    Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Safe Area" } })
 	self:NetworkVar("Bool", 7, "PreviewIgnoreZ",  { KeyName = "previewignorez", Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Show Through Walls" } })

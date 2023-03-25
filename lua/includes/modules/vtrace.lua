@@ -478,17 +478,25 @@ function DoTrace(TT, Callback)
 	Initialize(ClientData)
 end
 
-hook.Add("PlayerInitialSpawn", "CreateScanner", function()
+hook.Add("PlayerInitialSpawn", "CreateScanner", function(pl)
 	if SERVER then
-		local Scanner = ents.Create("vtrace_scanner")
-		Scanner.Busy = false
-		Scanner:Spawn()
+		hook.Add("SetupMove", "ScannerInit" .. pl:UserID(), function(ply, _, cmd)
+			if pl == ply and not cmd:IsForced() then
+				local Scanner = ents.Create("vtrace_scanner")
+				Scanner:SetPos(pl:GetPos())
+				Scanner.Busy = false
+				Scanner:Spawn()
+				hook.Remove("SetupMove", "ScannerInit" .. pl:UserID())
+			end
+		end)
 	end
 end)
 
 hook.Add("PostCleanupMap", "CreateScanner", function()
 	if SERVER then
 		local Scanner = ents.Create("vtrace_scanner")
+		local _, pl = next(player.GetAll())
+		Scanner:SetPos(pl:GetPos())
 		Scanner.Busy = false
 		Scanner:Spawn()
 	end
