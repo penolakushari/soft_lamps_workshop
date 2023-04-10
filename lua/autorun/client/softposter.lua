@@ -471,6 +471,7 @@ local function GodRaysPoster(godrays, postermul, split)
 
 	local lightcount = 0
 	for k, lamp in pairs(softlamps) do
+		if !lamp:GetHeavyOn() then continue end
 		local c = lamp:HeavyLightCount()
 		lightcount = lightcount + c
 		lights[lamp] = c
@@ -731,6 +732,7 @@ concommand.Add("poster_lightbounce", function(ply, cmd, args)
 	if flashlightdepthres != lightbounce_depthres then
 		print("r_flashlightdepthres is "..depthres.." ! Setting it to "..lightbounce_depthres.." ! Don't forget to turn off all lights before doing lightbounce")
 		RunConsoleCommand("r_flashlightdepthres", lightbounce_depthres)
+
 		LightBouncePoster(args[1], args[2], 1, args[3], args[4])
 		timer.Simple(0, function()
 			print("Restoring flashlightdepthres!")
