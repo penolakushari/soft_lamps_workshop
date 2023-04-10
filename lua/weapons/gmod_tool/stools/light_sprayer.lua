@@ -21,6 +21,8 @@ function TOOL:LeftClick(Trace)
 	local Ply = self:GetOwner()
 	// ("lightspray_calculate <FOV> <Accuracy> <Scan Radius> <Interval> <Scan Jitter> <Position Offset> <Start Distance> <End Distance>")
 	if SERVER then
+		ents.FindByClass("vtrace_scanner")[1]:SetPos(Ply:GetPos())
+
 		Ply:ConCommand("lightspray_calculate_advanced ".." "..	self:GetClientInfo("scan_fov").." "..
 																self:GetClientInfo("scan_accuracy_tolerance").." "..
 																self:GetClientInfo("scan_radius").." "..

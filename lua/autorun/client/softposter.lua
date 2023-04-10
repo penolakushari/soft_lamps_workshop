@@ -726,12 +726,18 @@ end)
 concommand.Add("poster_lightbounce", function(ply, cmd, args)
 	if #args < 3 then print("poster_lightbounce <lightsize> <lightbrightness> <postersize> <postersplit>") return end
 
-	local flashlightdepthres = GetConVar("r_flashlightdepthres"):GetInt()
+	local cvflashlightdepthres = GetConVar("r_flashlightdepthres")
+	local depthres = cvflashlightdepthres:GetInt()
 	if flashlightdepthres != lightbounce_depthres then
-		print("r_flashlightdepthres is "..flashlightdepthres.." ! Set it to "..lightbounce_depthres.." ! Don't forget to turn off all lights before doing so!")
-		return
+		print("r_flashlightdepthres is "..depthres.." ! Setting it to "..lightbounce_depthres.." ! Don't forget to turn off all lights before doing lightbounce")
+		RunConsoleCommand("r_flashlightdepthres", lightbounce_depthres)
+		LightBouncePoster(args[1], args[2], 1, args[3], args[4])
+		timer.Simple(0, function()
+			print("Restoring flashlightdepthres!")
+			RunConsoleCommand("r_flashlightdepthres", depthres)
+		end)
+	else
+		-- There used to be a 3rd argument, <lightpasses>. It has been disabled and set to always be 1.
+		LightBouncePoster(args[1], args[2], 1, args[3], args[4])
 	end
-
-	-- There used to be a 3rd argument, <lightpasses>. It has been disabled and set to always be 1.
-	LightBouncePoster(args[1], args[2], 1, args[3], args[4])
 end)--, nil, nil, FCVAR_SPONLY)
