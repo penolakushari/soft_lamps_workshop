@@ -19,7 +19,10 @@ if CLIENT then
  	language.Add( "tool.softlamp.radius",			"Shape radius:" )
  	language.Add( "tool.softlamp.radius.help",		"The radius of your lamp's light area" )
  	language.Add( "tool.softlamp.layers",			"Shape Layers:" )
- 	language.Add( "tool.softlamp.lightcount",		"Lights used:")
+ 	language.Add( "tool.softlamp.lightcount",		"Lights used:" )
+  
+	language.Add( "tool.softlamp.ortho_on",			"Enable Orthographic" )
+	language.Add( "tool.softlamp.ortho_size",		"Orthographic size:" )
   
 	language.Add( "lamptexture.debug",				"Debug White" )
 end
@@ -39,6 +42,8 @@ TOOL.ClientConVar[ "texture" ] = "models/debug/debugwhite"
 TOOL.ClientConVar[ "model" ] = "models/lamps/torch.mdl"
 TOOL.ClientConVar[ "toggle" ] = "1"
 TOOL.ClientConVar[ "on" ] = "1"
+TOOL.ClientConVar[ "orthoon" ] = "0"
+TOOL.ClientConVar[ "orthosize" ] = "512"
 
 TOOL.ClientConVar[ "shape" ] = next(vectorshapes.GetShapes(), nil) -- first shape found. really doesn't matter.
 TOOL.ClientConVar[ "radius" ] = "10"
@@ -69,6 +74,8 @@ function TOOL:LeftClick( trace )
 	local softradius = self:GetClientNumber( "radius" )
 	local softlayers = math.max(math.floor(self:GetClientNumber("layers")), 1)
 	local softshape = self:GetClientInfo("shape")
+	local orthoon = self:GetClientNumber("orthoon")
+	local orthosize = self:GetClientNumber("orthosize")
 
 	if ( !util.IsValidModel( mdl ) ) then return false end
 	if ( !util.IsValidProp( mdl ) ) then return false end
@@ -85,6 +92,12 @@ function TOOL:LeftClick( trace )
 		trace.Entity:SetNearZ(nearz)
 		trace.Entity:SetBrightness( bright )
 		trace.Entity:SetToggle( !toggle )
+
+		trace.Entity:SetEnableOrthographic(tobool(orthoon))
+		trace.Entity:SetOrthoLeft(orthosize)
+		trace.Entity:SetOrthoTop(orthosize)
+		trace.Entity:SetOrthoRight(orthosize)
+		trace.Entity:SetOrthoBottom(orthosize)
 
 		trace.Entity:SetHeavyShape(softshape)
 		trace.Entity:SetGameplayLayers(softlayers)
@@ -107,6 +120,9 @@ function TOOL:LeftClick( trace )
 		trace.Entity.brightness	= bright
 		trace.Entity.KeyDown = key
 
+		trace.Entity.OrthoOn = orthoon
+		trace.Entity.OrthoSize = orthosize
+
 		trace.Entity.SoftRadius = softradius
 		trace.Entity.SoftLayers = softlayers
 		trace.Entity.SoftShape = softshape
@@ -117,7 +133,7 @@ function TOOL:LeftClick( trace )
 
 	--if ( !self:GetSWEP():CheckLimit( "softlamps" ) ) then return false end
 
-	local lamp = MakeSoftLamp( ply, r, g, b, key, toggle, texture, mdl, fov, distance, nearz, bright, !toggle && on, softshape, softradius, softlayers, { Pos = pos, Angle = Angle( 0, 0, 0 ) } )
+	local lamp = MakeSoftLamp( ply, r, g, b, key, toggle, texture, mdl, fov, distance, nearz, bright, !toggle && on, softshape, softradius, softlayers, { Pos = pos, Angle = Angle( 0, 0, 0 ) }, orthoon, orthosize )
 
 	local CurPos = lamp:GetPos()
 	local NearestPoint = lamp:NearestPoint( CurPos - ( trace.HitNormal * 512 ) )
@@ -157,6 +173,8 @@ function TOOL:Reload( trace )
 	local softradius = self:GetClientNumber( "radius" )
 	local softlayers = math.max(math.floor(self:GetClientNumber("layers")), 1)
 	local softshape = self:GetClientInfo("shape")
+	local orthoon = self:GetClientNumber("orthoon")
+	local orthosize = self:GetClientNumber("orthosize")
 
 	if ( !util.IsValidModel( mdl ) ) then return false end
 	if ( !util.IsValidProp( mdl ) ) then return false end
@@ -166,7 +184,7 @@ function TOOL:Reload( trace )
 
 	if ( !self:GetSWEP():CheckLimit( "softlamps" ) ) then return false end
 
-	local lamp = MakeSoftLamp( ply, r, g, b, key, toggle, texture, mdl, fov, distance, nearz, bright, !toggle && on, softshape, softradius, softlayers, { Pos = pos, Angle = ang } )
+	local lamp = MakeSoftLamp( ply, r, g, b, key, toggle, texture, mdl, fov, distance, nearz, bright, !toggle && on, softshape, softradius, softlayers, { Pos = pos, Angle = ang }, orthoon, orthosize )
 
 	undo.Create( "SoftLamp" )
 		undo.AddEntity( lamp )
@@ -213,7 +231,7 @@ function TOOL:RightClick( trace )
 end
 
 if ( SERVER ) then
-	function MakeSoftLamp(pl, r, g, b, KeyDown, toggle, Texture, Model, fov, distance, nearz, brightness, on, SoftShape, SoftRadius, SoftLayers, Data)
+	function MakeSoftLamp(pl, r, g, b, KeyDown, toggle, Texture, Model, fov, distance, nearz, brightness, on, SoftShape, SoftRadius, SoftLayers, Data, OrthoOn, OrthoSize)
 
 		--if (IsValid(pl) and !pl:CheckLimit("softlamps")) then return false end
 
@@ -228,6 +246,12 @@ if ( SERVER ) then
 		lamp:SetDistance( distance )
 		lamp:SetNearZ( nearz )
 		lamp:SetBrightness( brightness )
+
+		lamp:SetEnableOrthographic(tobool(OrthoOn))
+		lamp:SetOrthoLeft(OrthoSize)
+		lamp:SetOrthoTop(OrthoSize)
+		lamp:SetOrthoRight(OrthoSize)
+		lamp:SetOrthoBottom(OrthoSize)
 
 		lamp:SetHeavyShape( SoftShape )
 		lamp:SetShapeRadius( SoftRadius )
@@ -263,13 +287,16 @@ if ( SERVER ) then
 		lamp.b = b
 		lamp.brightness	= brightness
 
+		lamp.OrthoOn = OrthoOn
+		lamp.OrthoSize = OrthoSize
+
 		lamp.shape = SoftShape
 		lamp.radius = SoftRadius
 		lamp.layers = SoftLayers
 
 		return lamp
 	end
-	duplicator.RegisterEntityClass("gmod_softlamp", MakeSoftLamp, "r", "g", "b", "KeyDown", "Toggle", "Texture", "Model", "fov", "distance", "nearz", "brightness", "on", "shape", "radius", "layers", "Data")
+	duplicator.RegisterEntityClass("gmod_softlamp", MakeSoftLamp, "r", "g", "b", "KeyDown", "Toggle", "Texture", "Model", "fov", "distance", "nearz", "brightness", "on", "shape", "radius", "layers", "Data", "OrthoOn", "OrthoSize")
 
 	local function Toggle( pl, ent, onoff )
 
@@ -386,6 +413,9 @@ function TOOL.BuildCPanel( CPanel )
 	CPanel:AddControl( "Color", { Label = "#tool.softlamp.color", Red = "softlamp_r", Green = "softlamp_g", Blue = "softlamp_b" } )
 
 	CPanel:AddControl( "PropSelect", { Label = "#tool.softlamp.model", ConVar = "softlamp_model", Height = 3, Models = list.Get( "LampModels" ) } )
+
+	CPanel:CheckBox("#tool.softlamp.ortho_on", "softlamp_orthoon")
+	CPanel:NumSlider("#tool.softlamp.ortho_size", "softlamp_orthosize", 0, 2048)
 end
 
 list.Set( "LampTextures", "models/debug/debugwhite", { Name = "#lamptexture.debug" } )

@@ -54,6 +54,8 @@ function ENT:Think()
 	self.distance = self:GetDistance()
 	self.nearz = self:GetNearZ()
 
+	self.OrthoOn = self:GetEnableOrthographic()
+
 	local col = self:GetLightColor():ToColor()
 	self.r = col.r
 	self.g = col.g
