@@ -247,11 +247,13 @@ if ( SERVER ) then
 		lamp:SetNearZ( nearz )
 		lamp:SetBrightness( brightness )
 
-		lamp:SetEnableOrthographic(tobool(OrthoOn))
-		lamp:SetOrthoLeft(OrthoSize)
-		lamp:SetOrthoTop(OrthoSize)
-		lamp:SetOrthoRight(OrthoSize)
-		lamp:SetOrthoBottom(OrthoSize)
+		if OrthoSize then
+			lamp:SetEnableOrthographic(tobool(OrthoOn))
+			lamp:SetOrthoLeft(OrthoSize)
+			lamp:SetOrthoTop(OrthoSize)
+			lamp:SetOrthoRight(OrthoSize)
+			lamp:SetOrthoBottom(OrthoSize)
+		end
 
 		lamp:SetHeavyShape( SoftShape )
 		lamp:SetShapeRadius( SoftRadius )
