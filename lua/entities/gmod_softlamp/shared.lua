@@ -5,7 +5,7 @@ DEFINE_BASECLASS( "base_gmodentity" )
 ENT.Base = "base_gmodentity"
 ENT.Author = "NeatNit"
 ENT.Spawnable	= false
-ENT.RenderGroup = RENDERGROUP_OPAQUE
+ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.PrintName = "Soft Lamp"
 ENT.Editable	= true	-- Set to FALSE after making a custom edit menu - but keep the Edit values defined to enable using the same system in the custom edit menu.
 

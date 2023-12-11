@@ -426,13 +426,15 @@ local function SoftPoster(postermul, split)
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
 
-		for lamp, brightness in pairs(lights) do
-			lamp:HeavyLightStart(brightness)
-		end
-
 		i = 0
 
 		for lamp in pairs(lights) do
+			lamp:HeavyLightPrepare()
+		end
+
+		for lamp, brightness in pairs(lights) do
+			lamp:HeavyLightStart(brightness)
+
 			while lamp:HeavyLightTick() do
 				i = i + 1
 				progressbar[2].progress = i
@@ -533,11 +535,13 @@ local function GodRaysPoster(godrays, postermul, split)
 
 		progressbar[1].progress = progressbar[1].progress + 1
 
-		for lamp, brightness in pairs(lights) do
-			lamp:HeavyLightStart(brightness, godrays)
+		for lamp in pairs(lights) do
+			lamp:HeavyLightPrepare()
 		end
 
-		for lamp in pairs(lights) do
+		for lamp, brightness in pairs(lights) do
+			lamp:HeavyLightStart(brightness, godrays)
+
 			local cont, ptindex, ptmax, vlp, vlpindex, vlpmax = lamp:HeavyLightTick()
 			while cont do
 				progressbar[2].progress = ptindex

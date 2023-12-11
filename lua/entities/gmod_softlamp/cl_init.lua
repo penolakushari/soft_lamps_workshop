@@ -49,12 +49,15 @@ function ENT:CreateFlashlights()
 	self.FlashlightsDirty = false
 end
 
+function ENT:HeavyLightPrepare()
+	self:ClearFlashlights()	-- they will be recreated in the next Think, after HeavyLights is done
+end
+
 --[[---------------------------------------------------------
    Name: HeavyLightStart
    Desc: Indicates to the 
 -----------------------------------------------------------]]
 function ENT:HeavyLightStart(brightness, vlplanecount)
-	self:ClearFlashlights()	-- they will be recreated in the next Think, after HeavyLights is done
 
 	if IsValid(self.HeavyLightPT) then self.HeavyLightPT:Remove() end
 	if IsValid(self.HeavyLightVLPlane) then self.HeavyLightVLPlane:Remove() end
