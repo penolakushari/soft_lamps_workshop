@@ -27,6 +27,7 @@ function ENT:Initialize()
 	-- Make lights start to the front of the lamp rather than inside it
 	self:SetLightOffset( Vector(self:OBBMaxs().x, 0, 0) )
 	self:SetHeavyOn(true)
+	self:SetHeavySplit(1)
 end
 
 function ENT:Come()

@@ -57,20 +57,32 @@ end
    Name: HeavyLightStart
    Desc: Indicates to the 
 -----------------------------------------------------------]]
-function ENT:HeavyLightStart(brightness, vlplanecount)
+function ENT:HeavyLightStart(brightness, vlplanecount, lampcount)
+	if not self.HeavyLightPT then self.HeavyLightPT = {} end
+	if not lampcount then lampcount = 1 end
 
-	if IsValid(self.HeavyLightPT) then self.HeavyLightPT:Remove() end
+	local split = self:GetHeavySplit()
+
+	for k, pt in ipairs(self.HeavyLightPT) do
+		if IsValid(pt) then pt:Remove() end
+	end
+	self.HeavyLightPT = {}
+
 	if IsValid(self.HeavyLightVLPlane) then self.HeavyLightVLPlane:Remove() end
 
-	self.HeavyLightPT = ProjectedTexture()
-	self.HeavyLightPT:SetEnableShadows(true)
-	self.HeavyLightPT:SetTexture(self:GetFlashlightTexture())
-	self.HeavyLightPT:SetNearZ(self:GetNearZ())
-	self.HeavyLightPT:SetFarZ(self:GetFarZ())
-	self.HeavyLightPT:SetFOV(self:GetLightFOV())
-	self.HeavyLightPT:SetOrthographic(self:GetEnableOrthographic(), self:GetOrthoLeft(), self:GetOrthoTop(), self:GetOrthoRight(), self:GetOrthoBottom())
-	self.HeavyLightPT:SetColor(self:GetLightColor():ToColor())
-	self.HeavyLightPT:SetBrightness(brightness)	-- brightness is dictated from outside
+	for i = 1, lampcount do
+		local pt = ProjectedTexture() 
+		pt:SetEnableShadows(true)
+		pt:SetTexture(self:GetFlashlightTexture())
+		pt:SetNearZ(self:GetNearZ())
+		pt:SetFarZ(self:GetFarZ())
+		pt:SetFOV(self:GetLightFOV() / split)
+		pt:SetOrthographic(self:GetEnableOrthographic(), self:GetOrthoLeft() / split, self:GetOrthoTop() / split, self:GetOrthoRight() / split, self:GetOrthoBottom() / split)
+		pt:SetColor(self:GetLightColor():ToColor())
+		pt:SetBrightness(brightness)	-- brightness is dictated from outside
+
+		self.HeavyLightPT[i] = pt
+	end
 
 	self.HeavyLightIndex = 0
 
@@ -99,24 +111,35 @@ function ENT:HeavyLightTick()
 	end
 
 	if nextpos then
-		self.HeavyLightIndex = self.HeavyLightIndex + 1
+		local done = false
 
-		if self.HeavyLightIndex > self:HeavyLightCount() then
+		for k, pt in ipairs(self.HeavyLightPT) do
+			self.HeavyLightIndex = self.HeavyLightIndex + 1
+
+			if self.HeavyLightIndex > self:HeavyLightCount() then
+				if k == 1 then
+					done = true
+				end
+				break
+			end
+
+			local pos = self:GetVecs(true).positions[self.HeavyLightIndex]
+			if not pos then
+				-- this shouldn't happen
+				error("Discrepancy between SoftLamp:HeavyLightCount() and SoftLamp:GetVecs(true) size!")
+			end
+
+			pt:SetPos(self:LocalToWorld(pos.vec))
+			pt:SetAngles(self:LocalToWorldAngles(pos.ang))
+			pt:Update()
+		end
+
+		if done then
 			-- All done.
-			self.HeavyLightPT:Remove()
+			for k, pt in ipairs(self.HeavyLightPT) do pt:Remove() end
 			--if IsValid(self.HeavyLightVLPlane) then self.HeavyLightVLPlane:Remove() end
 			return false
 		end
-
-		local pos = self:GetVecs(true).positions[self.HeavyLightIndex]
-		if not pos then
-			-- this shouldn't happen
-			error("Discrepancy between SoftLamp:HeavyLightCount() and SoftLamp:GetVecs(true) size!")
-		end
-
-		self.HeavyLightPT:SetPos(self:LocalToWorld(pos.vec))
-		self.HeavyLightPT:SetAngles(self:LocalToWorldAngles(pos.ang))
-		self.HeavyLightPT:Update()
 	end
 
 	if IsValid(self.HeavyLightVLPlane) then
@@ -127,24 +150,26 @@ function ENT:HeavyLightTick()
 
 		local ang = math.Remap(self.HeavyLightVLPlaneIndex, min, max, -fov, fov)
 
-		local worldpos, worldang = LocalToWorld(Vector(0, 0, 0), Angle(0, ang, 0), self.HeavyLightPT:GetPos(), self.HeavyLightPT:GetAngles())
+		local worldpos, worldang = LocalToWorld(Vector(0, 0, 0), Angle(0, ang, 0), self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles())
 		--print(worldpos, worldang)
 
 		self.HeavyLightVLPlane:SetPos(worldpos)
 		self.HeavyLightVLPlane:SetAngles(worldang)
 
 		self.HeavyLightVLPlane:SetupBones()
-		self.HeavyLightPT:Update() --?
+		self.HeavyLightPT[1]:Update() --?
 	end
 
 	return true, self.HeavyLightIndex, #self:GetVecs(true).positions, self.HeavyLightVLPlane, self.HeavyLightVLPlaneIndex, self.HeavyLightVLPlaneMax
 end
 
 function ENT:Think()
-	if IsValid(self.HeavyLightPT) then
-		self.HeavyLightPT:Remove()
+	if self.HeavyLightPT then
+		for k, pt in ipairs(self.HeavyLightPT) do
+			if IsValid(pt) then pt:Remove() end
+		end
+		self.HeavyLightPT = nil
 	end
-	self.HeavyLightPT = nil
 
 	if IsValid(self.HeavyLightVLPlane) then
 		self.HeavyLightVLPlane:Remove()

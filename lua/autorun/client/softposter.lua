@@ -1,5 +1,6 @@
 --print("\tIF YOU SEE THIS TELL NEATNIT!! SoftPoster just got loaded!")
 local extraframes = CreateClientConVar("poster_extraframes", "0")
+local lampcount = CreateClientConVar("poster_uselampcount", "1", true, false, "Soft Lamps: Amount of lamps to enable during 1 render tick", 1, 8)
 
 local tex_render = render.GetSuperFPTex()
 local tex_blend  = render.GetSuperFPTex2()
@@ -426,6 +427,9 @@ local function SoftPoster(postermul, split)
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
 
+		local lampc = lampcount:GetInt()
+		if lampc < 1 then lampc = 1 end
+
 		i = 0
 
 		for lamp in pairs(lights) do
@@ -433,10 +437,10 @@ local function SoftPoster(postermul, split)
 		end
 
 		for lamp, brightness in pairs(lights) do
-			lamp:HeavyLightStart(brightness)
+			lamp:HeavyLightStart(brightness, nil, lampc)
 
 			while lamp:HeavyLightTick() do
-				i = i + 1
+				i = i + lampc
 				progressbar[2].progress = i
 				DoRender(progressbar)
 			end
@@ -733,7 +737,7 @@ concommand.Add("poster_lightbounce", function(ply, cmd, args)
 
 	local cvflashlightdepthres = GetConVar("r_flashlightdepthres")
 	local depthres = cvflashlightdepthres:GetInt()
-	if flashlightdepthres != lightbounce_depthres then
+	if depthres != lightbounce_depthres then
 		print("r_flashlightdepthres is "..depthres.." ! Setting it to "..lightbounce_depthres.." ! Don't forget to turn off all lights before doing lightbounce")
 		RunConsoleCommand("r_flashlightdepthres", lightbounce_depthres)
 

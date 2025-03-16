@@ -50,6 +50,7 @@ function ENT:SetupDataTables()
 	self:NetworkVar("String", 1, "HeavyShape",  { KeyName = "pshape",  Edit = { order = orderer(), category = "HeavyLight", type = "Combo", title = "Surface Shape", values = combo } })
 	self:NetworkVar("Float",  4, "ShapeRadius", { KeyName = "sradius", Edit = { order = orderer(), category = "HeavyLight", type = "Float", title = "Surface Radius", min = 1, max = 1048576 } })
 	self:NetworkVar("Int",    0, "HeavyLayers", { KeyName = "players", Edit = { order = orderer(), category = "HeavyLight", type = "Int",   title = "Surface Shape Resolution", min = 1, max = 200 } })
+	self:NetworkVar("Int",    1, "HeavySplit", 	{ KeyName = "split",   Edit = { order = orderer(), category = "HeavyLight", type = "Int",   title = "Split Lights", min = 1, max = 10 } })
 
 	local combo2 = table.Copy(combo)
 	combo2["Same as above"] = ""
@@ -57,7 +58,7 @@ function ENT:SetupDataTables()
 	self:NetworkVar("Bool",   3, "On",             { KeyName = "pon",     Edit = { order = orderer(), category = "Gameplay", type = "Boolean", title = "On" } })
 	--self:NetworkVar("Float",  5, "Scroll",         { KeyName = "pon",     Edit = { order = orderer(), category = "Gameplay", type = "Float", title = "Scroll Speed (override gameplay shape)", min = 0, max = 60 } })
 	self:NetworkVar("String", 2, "GameplayShape",  { KeyName = "sshape",  Edit = { order = orderer(), category = "Gameplay", type = "Combo",  title = "Surface Shape", values = combo2, text = "Same as above" } })
-	self:NetworkVar("Int",    1, "GameplayLayers", { KeyName = "slayers", Edit = { order = orderer(), category = "Gameplay", type = "Int",   title = "Surface Shape Resolution", min = 1, max = 100 } })
+	self:NetworkVar("Int",    2, "GameplayLayers", { KeyName = "slayers", Edit = { order = orderer(), category = "Gameplay", type = "Int",   title = "Surface Shape Resolution", min = 1, max = 100 } })
 
 	-- Visualization
 	self:NetworkVar("Bool", 4, "PreviewPoster",   { KeyName = "previewposter",  Edit = { order = orderer(), category = "Visualization", type = "Combo", title = "Pick Target", values = { Gameplay = false, HeavyLight = true }, text = "Gameplay" } })
@@ -77,6 +78,7 @@ end
 function ENT:GetVecs(heavy, world)
 	self:CheckDirty()
 	local vecs
+	local split = self:GetHeavySplit()
 
 	if (not heavy and self.VecsDirty == false) then
 		vecs = self.Vecs
@@ -85,20 +87,51 @@ function ENT:GetVecs(heavy, world)
 
 	else
 		if heavy then
-
 			local shape = self:GetHeavyShape()
 			local radius = self:GetShapeRadius()
 			local layers = self:GetHeavyLayers()
 
 			vecs = vectorshapes.MakeShape(shape, radius, layers)
 
+			if ( split > 1 ) then
+				local oldall = vecs.all
+				vecs.all = {}
+
+				if self:GetEnableOrthographic() then
+					local hor, ver = (self:GetOrthoLeft() + self:GetOrthoRight()), (self:GetOrthoTop() + self:GetOrthoBottom())
+					local midh, midv = hor / 2, ver / 2
+					local steph, stepv = hor / split, ver / split
+
+					for k, v in pairs(oldall) do
+						for i = 0, split - 1 do
+							for j = 0, split - 1 do
+								local vec = v + Vector(0, -midh + steph/2 + steph*j, midv - stepv/2 - stepv*i)
+								table.insert(vecs.all, vec)
+							end
+						end
+					end
+				else
+					for k, v in pairs(oldall) do -- add more points, we'll rotate their angles later
+						for i = 1, split^2 do
+							table.insert(vecs.all, v)
+						end
+					end
+				end
+
+			end
+
 			vecs._shape = shape
 			vecs._radius = radius
 			vecs._layers = layers
+			vecs._split = split
+			vecs._ortho = self:GetEnableOrthographic()
+			vecs._orthol = self:GetOrthoLeft()
+			vecs._orthor = self:GetOrthoRight()
+			vecs._orthot = self:GetOrthoTop()
+			vecs._orthob = self:GetOrthoBottom()
 
 			self.HeavyVecs = vecs
 			self.HeavyVecsDirty = false
-
 		else
 
 			local shape = self:GetGameplayShape()
@@ -139,6 +172,19 @@ function ENT:GetVecs(heavy, world)
 				vecs.positions[k].ang = Angle()
 			end
 
+			if heavy and split > 1 and not self:GetEnableOrthographic() then
+				local fov = self:GetLightFOV()
+				local fovhalf, fovpart = fov/2, fov/split
+				local sqr = split^2
+				local id = (k % sqr)
+				if id == 0 then id = sqr end
+
+				local i = (math.ceil(id/split)) - 1
+				local j = id % split
+
+				vecs.positions[k].ang:Add(Angle( -fovhalf + fovpart/2 + fovpart*j, -fovhalf + fovpart/2 + fovpart*i, 0))
+			end
+
 			v:Add(offset)
 			vecs.positions[k].vec = v
 		end
@@ -173,7 +219,13 @@ function ENT:CheckDirty()
 		self.HeavyVecs._radius ~= self:GetShapeRadius() or
 		self.HeavyVecs._layers ~= self:GetHeavyLayers() or
 		self.HeavyVecs._offset ~= self:GetLightOffset() or
-		self.HeavyVecs._focus ~= self:GetFocalDistance() )
+		self.HeavyVecs._focus ~= self:GetFocalDistance() or
+		self.HeavyVecs._split ~= self:GetHeavySplit() or
+		self.HeavyVecs._ortho ~= self:GetEnableOrthographic() or
+		self.HeavyVecs._orthol ~= self:GetOrthoLeft() or
+		self.HeavyVecs._orthor ~= self:GetOrthoRight() or
+		self.HeavyVecs._orthot ~= self:GetOrthoTop() or
+		self.HeavyVecs._orthob ~= self:GetOrthoBottom() )
 	then
 		self.HeavyVecsDirty = true
 	end
