@@ -124,6 +124,7 @@ function ENT:GetVecs(heavy, world)
 			vecs._radius = radius
 			vecs._layers = layers
 			vecs._split = split
+			vecs._fov = self:GetLightFOV()
 			vecs._ortho = self:GetEnableOrthographic()
 			vecs._orthol = self:GetOrthoLeft()
 			vecs._orthor = self:GetOrthoRight()
@@ -185,7 +186,7 @@ function ENT:GetVecs(heavy, world)
 				vecs.positions[k].ang:Add(Angle( -fovhalf + fovpart/2 + fovpart*j, -fovhalf + fovpart/2 + fovpart*i, 0))
 			end
 
-			v:Add(offset)
+			v = v + offset
 			vecs.positions[k].vec = v
 		end
 
@@ -225,7 +226,8 @@ function ENT:CheckDirty()
 		self.HeavyVecs._orthol ~= self:GetOrthoLeft() or
 		self.HeavyVecs._orthor ~= self:GetOrthoRight() or
 		self.HeavyVecs._orthot ~= self:GetOrthoTop() or
-		self.HeavyVecs._orthob ~= self:GetOrthoBottom() )
+		self.HeavyVecs._orthob ~= self:GetOrthoBottom() or
+		((self.HeavyVecs._split > 1) and (self.HeavyVecs._fov ~= self:GetLightFOV())) )
 	then
 		self.HeavyVecsDirty = true
 	end
