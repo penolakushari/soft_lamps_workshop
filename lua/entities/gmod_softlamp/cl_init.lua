@@ -149,7 +149,6 @@ function ENT:HeavyLightTick()
 		local max = self.HeavyLightVLPlaneMax
 
 		local ang = math.Remap(self.HeavyLightVLPlaneIndex, min, max, -fov, fov)
-
 		local worldpos, worldang = LocalToWorld(Vector(0, 0, 0), Angle(0, ang, 0), self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles())
 		--print(worldpos, worldang)
 

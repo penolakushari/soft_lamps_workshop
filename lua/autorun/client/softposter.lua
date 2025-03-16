@@ -194,10 +194,9 @@ function SingleRender(ent, progressbardata, fuckshit, camstarter)
 	cam.End()
 
 	-- render.Clear(1, 1, 1, 255)
-
+	render.UpdateScreenEffectTexture()
 	DrawColorModify(colormod)	-- all pixels are either 0 or 255 (R=G=B)
 	DrawColorModify(colormod2)	-- all pixels are either 0 or 1
-	render.UpdateScreenEffectTexture()
 
 	render.PushRenderTarget(tex_render)
 		mat_copy:SetTexture("$basetexture", tex_scrfx)
