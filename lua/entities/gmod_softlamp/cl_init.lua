@@ -240,9 +240,14 @@ function ENT:Draw()
 	self.lastdraw = now
 
 	if self:GetPreviewIgnoreZ() then render.SetColorMaterialIgnoreZ() else render.SetColorMaterial() end
+	local lastvec = nil
 	for k, vec in pairs(points.all) do
 		-- Draw the absolute minimal sphere that has volume for each projected texture:
-		render.DrawSphere( self:LocalToWorld(vec), size, 4, 3, Color(self.drawbrightness, self.drawbrightness, self.drawbrightness) )
+		if not lastvec or not vec:IsEqualTol(lastvec, 0.5) then
+			render.DrawSphere( self:LocalToWorld(vec), size, 4, 3, Color(self.drawbrightness, self.drawbrightness, self.drawbrightness) )
+		end
+
+		lastvec = vec
 	end
 end
 

@@ -179,14 +179,16 @@ function ENT:GetVecs(heavy, world)
 				local sqr = split^2
 				local id = (k % sqr)
 				if id == 0 then id = sqr end
+				if id == 1 then v:Add(offset) end
 
 				local i = (math.ceil(id/split)) - 1
 				local j = id % split
 
 				vecs.positions[k].ang:Add(Angle( -fovhalf + fovpart/2 + fovpart*j, -fovhalf + fovpart/2 + fovpart*i, 0))
+			else
+				v:Add(offset)
 			end
 
-			v = v + offset
 			vecs.positions[k].vec = v
 		end
 
