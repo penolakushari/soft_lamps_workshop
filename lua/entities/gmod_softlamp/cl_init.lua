@@ -62,6 +62,7 @@ function ENT:HeavyLightStart(brightness, vlplanecount, lampcount)
 	if not lampcount then lampcount = 1 end
 
 	local split = self:GetHeavySplit()
+	local splitf = (split > 1) and (split / 1.16) or split-- 98.5 / 90 = 1.094444 , adjustment for that flashlight square texture
 
 	for k, pt in ipairs(self.HeavyLightPT) do
 		if IsValid(pt) then pt:Remove() end
@@ -76,8 +77,8 @@ function ENT:HeavyLightStart(brightness, vlplanecount, lampcount)
 		pt:SetTexture(self:GetFlashlightTexture())
 		pt:SetNearZ(self:GetNearZ())
 		pt:SetFarZ(self:GetFarZ())
-		pt:SetFOV(self:GetLightFOV() / split)
-		pt:SetOrthographic(self:GetEnableOrthographic(), self:GetOrthoLeft() / split, self:GetOrthoTop() / split, self:GetOrthoRight() / split, self:GetOrthoBottom() / split)
+		pt:SetFOV(self:GetLightFOV() / split) 
+		pt:SetOrthographic(self:GetEnableOrthographic(), self:GetOrthoLeft() / splitf, self:GetOrthoTop() / splitf, self:GetOrthoRight() / splitf, self:GetOrthoBottom() / splitf)
 		pt:SetColor(self:GetLightColor():ToColor())
 		pt:SetBrightness(brightness)	-- brightness is dictated from outside
 
@@ -89,6 +90,7 @@ function ENT:HeavyLightStart(brightness, vlplanecount, lampcount)
 	if vlplanecount then
 		self.HeavyLightVLPlaneIndex = 0
 		self.HeavyLightVLPlaneMax = vlplanecount
+		self.HeavyLightVLPlanePass = 1
 		self.HeavyLightVLPlane = ClientsideModel("models/vlplane/vlplane.mdl", RENDERGROUP_TRANSLUCENT)
 		self.HeavyLightVLPlane:SetNoDraw(false)--true)	-- wait until it's being activated
 		self.HeavyLightVLPlane:SetModelScale(10000)
@@ -105,7 +107,12 @@ function ENT:HeavyLightTick()
 		self.HeavyLightVLPlaneIndex = self.HeavyLightVLPlaneIndex + 1
 		nextpos = self.HeavyLightIndex == 0	-- FALSE unless this is the first one. Basically a hack because I cba to restructure my code in a more logical way.
 		if self.HeavyLightVLPlaneIndex > self.HeavyLightVLPlaneMax then
-			nextpos = true
+			if self.HeavyLightVLPlanePass > 1 then
+				nextpos = true
+				self.HeavyLightVLPlanePass = 1
+			else
+				self.HeavyLightVLPlanePass = 2
+			end
 			self.HeavyLightVLPlaneIndex = 1
 		end
 	end
@@ -149,7 +156,12 @@ function ENT:HeavyLightTick()
 		local max = self.HeavyLightVLPlaneMax
 
 		local ang = math.Remap(self.HeavyLightVLPlaneIndex, min, max, -fov, fov)
-		local worldpos, worldang = LocalToWorld(Vector(0, 0, 0), Angle(0, ang, 0), self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles())
+		local worldpos, worldang
+		if self.HeavyLightVLPlanePass > 1 then
+			worldpos, worldang = LocalToWorld(vector_origin, Angle(ang, 0, 90), self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles())
+		else
+			worldpos, worldang = LocalToWorld(vector_origin, Angle(0, ang, 0), self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles())
+		end
 		--print(worldpos, worldang)
 
 		self.HeavyLightVLPlane:SetPos(worldpos)
@@ -237,6 +249,7 @@ function ENT:Draw()
 
 	local now = RealTime()
 	self.drawbrightness = math.Approach(self.drawbrightness or 128,self:GetOn() and 255 or 0, (now-(self.lastdraw or 0))*512)
+	local color = Color(self.drawbrightness, self.drawbrightness, self.drawbrightness)
 	self.lastdraw = now
 
 	if self:GetPreviewIgnoreZ() then render.SetColorMaterialIgnoreZ() else render.SetColorMaterial() end
@@ -244,7 +257,7 @@ function ENT:Draw()
 	for k, vec in pairs(points.all) do
 		-- Draw the absolute minimal sphere that has volume for each projected texture:
 		if not lastvec or not vec:IsEqualTol(lastvec, 0.5) then
-			render.DrawSphere( self:LocalToWorld(vec), size, 4, 3, Color(self.drawbrightness, self.drawbrightness, self.drawbrightness) )
+			render.DrawSphere( self:LocalToWorld(vec), size, 4, 3,  color)
 		end
 
 		lastvec = vec

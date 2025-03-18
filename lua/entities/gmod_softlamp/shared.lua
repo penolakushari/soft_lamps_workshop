@@ -98,8 +98,8 @@ function ENT:GetVecs(heavy, world)
 				vecs.all = {}
 
 				if self:GetEnableOrthographic() then
-					local hor, ver = (self:GetOrthoLeft() + self:GetOrthoRight()), (self:GetOrthoTop() + self:GetOrthoBottom())
-					local midh, midv = hor / 2, ver / 2
+					local midh, midv = self:GetOrthoRight(), self:GetOrthoTop()
+					local hor, ver = (self:GetOrthoLeft() + midh), (midv + self:GetOrthoBottom())
 					local steph, stepv = hor / split, ver / split
 
 					for k, v in pairs(oldall) do
