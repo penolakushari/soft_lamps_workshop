@@ -609,7 +609,7 @@ concommand.Add("poster_godrays", function(ply, cmd, args)
 	local softlamps = ents.FindByClass("gmod_softlamp")
 
 	for k, lamp in pairs(softlamps) do
-		if !lamp:GetHeavyOn() then continue end
+		if !lamp:GetHeavyOn() or lamp:GetHeavyLayers() == 1 then continue end
 		shapemem[lamp] = lamp:GetHeavyLayers()
 		lamp:SetHeavyLayers(1)
 	end
