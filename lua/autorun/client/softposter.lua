@@ -595,6 +595,7 @@ concommand.Add("poster_soft", function(ply, cmd, args)
 		print("poster_soft <poster size> <poster split>")
 		return
 	end
+
 	SoftPoster(unpack(args))
 end)--, nil, nil, FCVAR_SPONLY)
 
@@ -603,7 +604,23 @@ concommand.Add("poster_godrays", function(ply, cmd, args)
 		print("poster_godrays <accuracy> <poster size> <poster split>")
 		return
 	end
+
+	local shapemem = {}
+	local softlamps = ents.FindByClass("gmod_softlamp")
+
+	for k, lamp in pairs(softlamps) do
+		if !lamp:GetHeavyOn() then continue end
+		shapemem[lamp] = lamp:GetHeavyLayers()
+		lamp:SetHeavyLayers(1)
+	end
+
 	GodRaysPoster(unpack(args))
+
+	timer.Simple(0, function()
+		for lamp, shapes in pairs(shapemem) do
+			lamp:SetHeavyLayers(shapes)
+		end
+	end)
 end)--, nil, nil, FCVAR_SPONLY)
 
 local GlobalNearZ = 5
