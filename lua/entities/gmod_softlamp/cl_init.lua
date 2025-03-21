@@ -171,7 +171,7 @@ function ENT:HeavyLightTick()
 		self.HeavyLightPT[1]:Update() --?
 	end
 
-	return true, self.HeavyLightIndex, #self:GetVecs(true).positions, self.HeavyLightVLPlane, self.HeavyLightVLPlaneIndex, self.HeavyLightVLPlaneMax
+	return true, self.HeavyLightVLPlane, self.HeavyLightVLPlaneIndex
 end
 
 function ENT:Think()

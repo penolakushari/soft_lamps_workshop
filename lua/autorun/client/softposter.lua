@@ -543,16 +543,16 @@ local function GodRaysPoster(godrays, postermul, split)
 			lamp:HeavyLightPrepare()
 		end
 
+		local j = 0
+
 		for lamp, brightness in pairs(lights) do
 			lamp:HeavyLightStart(brightness, godrays)
+			j = j + 1
+			progressbar[2].progress = j
 
-			local cont, ptindex, ptmax, vlp, vlpindex, vlpmax = lamp:HeavyLightTick()
+			local cont, vlp, vlpindex = lamp:HeavyLightTick()
 			while cont do
-				progressbar[2].progress = ptindex
-				progressbar[2].max = ptmax
-
 				progressbar[3].progress = vlpindex
-				progressbar[3].max = vlpmax
 
 				-- enttorender:SetLocalPos(Vector(math.Remap(vlpindex,1,vlpmax,0,100), 0, 0))
 				-- enttorender:SetupBones()
@@ -561,7 +561,7 @@ local function GodRaysPoster(godrays, postermul, split)
 				SingleRender(vlp, progressbar, vlpindex == 1, camstarts[i])
 				-- DoRender(progressbar)
 
-				cont, ptindex, ptmax, vlp, vlpindex, vlpmax = lamp:HeavyLightTick()
+				cont, vlp, vlpindex = lamp:HeavyLightTick()
 			end
 		end
 		FinishRender(false)
@@ -611,6 +611,7 @@ concommand.Add("poster_godrays", function(ply, cmd, args)
 	for k, lamp in pairs(softlamps) do
 		if !lamp:GetHeavyOn() or lamp:GetHeavyLayers() == 1 then continue end
 		shapemem[lamp] = lamp:GetHeavyLayers()
+		print(tostring(lamp) .. " Surface Shape Resolution is set to " .. tostring(shapemem[lamp]) .. ", setting it to 1 for the godrays render")
 		lamp:SetHeavyLayers(1)
 	end
 
@@ -618,6 +619,7 @@ concommand.Add("poster_godrays", function(ply, cmd, args)
 
 	timer.Simple(0, function()
 		for lamp, shapes in pairs(shapemem) do
+			print("Resetting " .. tostring(lamp) .. " Surface Shape Resolution to " .. tostring(shapes))
 			lamp:SetHeavyLayers(shapes)
 		end
 	end)
