@@ -465,7 +465,7 @@ local function SoftPoster(postermul, split)
 	RunConsoleCommand("poster", postermul, split)
 end
 
-local function GodRaysPoster(godrays, postermul, split)
+local function GodRaysPoster(godrays, postermul, split, shapemem)
 	godrays = godrays + 0	-- convert to number
 
 	local extra = extraframes:GetInt()
@@ -576,6 +576,11 @@ local function GodRaysPoster(godrays, postermul, split)
 			print("", "Darkness: ", darken)
 			print("", "Additive: ", additive or false)
 			print("", "Anti-Aliasing: ", antialias)
+
+			for lamp, shapes in pairs(shapemem) do
+				print("Resetting " .. tostring(lamp) .. " Surface Shape Resolution to " .. tostring(shapes))
+				lamp:SetHeavyLayers(shapes)
+			end
 		end
 
 		return true
@@ -615,14 +620,7 @@ concommand.Add("poster_godrays", function(ply, cmd, args)
 		lamp:SetHeavyLayers(1)
 	end
 
-	GodRaysPoster(unpack(args))
-
-	timer.Simple(0, function()
-		for lamp, shapes in pairs(shapemem) do
-			print("Resetting " .. tostring(lamp) .. " Surface Shape Resolution to " .. tostring(shapes))
-			lamp:SetHeavyLayers(shapes)
-		end
-	end)
+	GodRaysPoster(args[1], args[2], args[3], shapemem)
 end)--, nil, nil, FCVAR_SPONLY)
 
 local GlobalNearZ = 5
@@ -637,7 +635,7 @@ it? hope it  works  and  hope
 it looks awesome :D
 --]]---------------------------
 
-local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul, split )
+local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul, split, depthres )
 	local extra = extraframes:GetInt()
 	local callsleft = postermul * postermul + extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
 	local starttime = SysTime()	-- benchmarking + feedback
@@ -737,6 +735,11 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 			print("", "Darkness: ", darken)
 			print("", "Additive: ", additive or false)
 			print("", "Anti-Aliasing: ", antialias)
+
+			if depthres then
+				print("Restoring flashlightdepthres!")
+				RunConsoleCommand("r_flashlightdepthres", depthres)
+			end
 		end
 
 		return true
@@ -760,11 +763,7 @@ concommand.Add("poster_lightbounce", function(ply, cmd, args)
 		print("r_flashlightdepthres is "..depthres.." ! Setting it to "..lightbounce_depthres.." ! Don't forget to turn off all lights before doing lightbounce")
 		RunConsoleCommand("r_flashlightdepthres", lightbounce_depthres)
 
-		LightBouncePoster(args[1], args[2], 1, args[3], args[4])
-		timer.Simple(0, function()
-			print("Restoring flashlightdepthres!")
-			RunConsoleCommand("r_flashlightdepthres", depthres)
-		end)
+		LightBouncePoster(args[1], args[2], 1, args[3], args[4], depthres)
 	else
 		-- There used to be a 3rd argument, <lightpasses>. It has been disabled and set to always be 1.
 		LightBouncePoster(args[1], args[2], 1, args[3], args[4])
