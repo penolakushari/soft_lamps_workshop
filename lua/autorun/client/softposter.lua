@@ -155,6 +155,90 @@ local function DoRender(progressbardata)
 	render.Spin()
 end
 
+local function DoRenderV2(progressbardata)
+	-- Render the scene normally to the whole texture (with inevitable 100% alpha)
+	-- BUG!! Rendering into a non-default RT disables anti-aliasing!!
+	-- WORKAROUND: Render to default RT, copy over to tex_render
+	-- Workaround downside is that bright pixels (brighter than 255) will be capped, therefore color quality is lost.
+	if antialias then
+		-- workaround
+		render.RenderView()
+		render.UpdateScreenEffectTexture()
+
+		render.PushRenderTarget(tex_scrfx)
+			mat_copy:SetTexture("$basetexture", tex_scrfx)
+			render.SetMaterial(mat_copy)
+			render.DrawScreenQuad()
+		render.PopRenderTarget()
+	else
+		-- give up on anti-aliasing to get better color accuracy in bright areas
+		render.PushRenderTarget(tex_scrfx)
+			render.RenderView()
+			hook.Run("RenderScreenspaceEffects")
+			render.UpdateScreenEffectTexture()
+		render.PopRenderTarget()
+	end
+
+	renders = renders + 1
+
+	-- Blend multiple renders together:
+	render.PushRenderTarget(tex_blend)
+		if renders == 1 then render.Clear(0, 0, 0, 255) end	-- clear on first render
+
+		-- Additively paste the current frame onto the blend
+		mat_add:SetTexture("$basetexture", tex_scrfx)
+		render.SetMaterial(mat_add)
+		render.DrawScreenQuad()
+	render.PopRenderTarget()
+
+
+	-- Draw progress on the screen so the user can get a sense of progress and know that the game isn't stuck
+	-- Put something pretty and technical on the screen:
+	local ShowOnScreen = tex_blend
+	--if additive then ShowOnScreen = tex_blend end
+	mat_copy:SetTexture("$basetexture", ShowOnScreen)
+	render.SetMaterial(mat_copy)
+	render.DrawScreenQuad()
+
+	-- Draw progress bars:
+	cam.Start2D()
+		local y = ScrH() - 20
+		local x = ScrW() / 2
+		for k, v in ipairs(progressbardata) do
+			-- Grey outline:
+			surface.SetDrawColor(50, 50, 50)
+			surface.DrawRect(x-301, y-10, 602, 20)
+			-- lighter-grey infill:
+			surface.SetDrawColor(100, 100, 100)
+			surface.DrawRect(x-300, y-9, 600, 18)
+
+			-- Green progress bar:
+			local progress = 600 * v.progress / v.max
+			surface.SetDrawColor(20, 150, 20)
+			surface.DrawRect(x-300, y-9, progress, 18)
+
+			-- Text:
+			surface.SetFont("DermaDefault")
+
+			-- Progress bar text (example: 100 / 350)
+			local text = v.progress .. " / " .. v.max
+			local w, h = surface.GetTextSize(text)
+			surface.SetTextPos(x-(w/2), y-(h/2))
+			surface.SetTextColor(255, 255, 255)
+			surface.DrawText(text)
+
+			-- Title:
+			surface.SetTextPos(x-296, y-(h/2))	-- Start of the progress bar
+			surface.DrawText(v.title)
+
+			y = y - 50 -- next progress bar is above
+		end
+	cam.End2D()
+
+	-- Update the screen
+	render.Spin()
+end
+
 function RenderZBuffer()
 	render.RenderView()
 	render.Clear(0, 0, 0, 255, false, true)
@@ -351,6 +435,42 @@ local function FinishRender()
 	-- let the render end naturally
 end
 
+local function FinishRenderV2()
+	-- Divide the sum of the additive renders by the number of renders to get an average, blended result
+	local someparameter = 2100 -- the higher the darker
+	local mul = (planes and 1 or 1) / (planes and someparameter or renders)
+	local rt = planes and tex_blendint or tex_blend
+	rt = tex_blend
+
+	if additive then mul = 1 end
+
+	mul = mul / darken
+
+	render.PushRenderTarget(rt)
+		mat_divide:SetTexture("$fbtexture", rt)
+		mat_divide:SetFloat("$pp_colour_contrast", mul)
+		render.SetMaterial(mat_divide)
+		render.DrawScreenQuad()
+	render.PopRenderTarget()
+
+	-- copy the blended image onto the framebuffer:
+	-- if planes then
+	-- 	mat_gmodscreenspace:SetTexture("$basetexture", tex_blend)
+	-- 	mat_gmodscreenspace:SetFloat("$alpha", 1)
+	-- 	render.SetMaterial(mat_gmodscreenspace)
+	-- else
+	mat_copy:SetTexture("$basetexture", rt)
+	render.SetMaterial(mat_copy)
+
+	-- end
+	render.DrawScreenQuad()
+	render.DrawScreenQuad()	-- done twice fix bug where the first DrawScreenQuad is ignored for some reason.
+
+	renders = 0	-- reset render count for next frame
+
+	-- let the render end naturally
+end
+
 local function ReFinishRender(postermul, split)
 
 	mul = (planes and 1 or 1) / (planes and someparameter or renders)
@@ -446,6 +566,89 @@ local function SoftPoster(postermul, split)
 			end
 		end
 		FinishRender()
+
+		callsleft = callsleft - 1
+		if (callsleft <= 0) then
+			hook.Remove("RenderScene","SoftPoster")
+
+			local endtime = SysTime()
+			print("Poster finished with the following values:")
+			print("", "Render Time: ", endtime-starttime .. " seconds.")
+			print("", "Darkness: ", darken)
+			print("", "Additive: ", additive or false)
+			print("", "Anti-Aliasing: ", antialias)
+		end
+
+		return true
+	end)
+
+	RunConsoleCommand("poster", postermul, split)
+end
+
+local function SoftPosterV2(postermul, split) -- V2 versions of these things exist to be able to fuck around and find out without messing up previous use working stuff
+	local extra = extraframes:GetInt()
+	local callsleft = postermul * postermul + extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
+	local starttime = SysTime()	-- benchmarking + feedback
+
+	local lights = {}
+	local softlamps = ents.FindByClass("gmod_softlamp")
+
+	local lightcount = 0
+	for k, lamp in pairs(softlamps) do
+		if !lamp:GetHeavyOn() then continue end
+		local c = lamp:HeavyLightCount()
+		lightcount = lightcount + c
+		lights[lamp] = c
+	end
+
+	for lamp, c in pairs(lights) do
+		-- The thing about brightness:
+		-- The scene will be rendered lightcount times.
+		-- Each lamp must actually be brighter because it will not be on every render.
+		if c > 0 then
+			local bright = lamp:GetBrightness() / 6.5
+			local mul = lightcount / c
+
+			lights[lamp] = bright * mul
+		end
+	end
+
+	local progressbar = {
+		{
+			title = "Poster",
+			progress = 0,
+			max = callsleft
+		},
+		{
+			title = "Soft Shadows",
+			progress = 0,
+			max = lightcount
+		}
+	}
+
+
+	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
+		progressbar[1].progress = progressbar[1].progress + 1
+
+		local lampc = lampcount:GetInt()
+		if lampc < 1 then lampc = 1 end
+
+		i = 0
+
+		for lamp in pairs(lights) do
+			lamp:HeavyLightPrepare()
+		end
+
+		for lamp, brightness in pairs(lights) do
+			lamp:HeavyLightStart(brightness, nil, lampc)
+
+			while lamp:HeavyLightTick() do
+				i = i + lampc
+				progressbar[2].progress = i
+				DoRenderV2(progressbar)
+			end
+		end
+		FinishRenderV2()
 
 		callsleft = callsleft - 1
 		if (callsleft <= 0) then
@@ -604,6 +807,16 @@ concommand.Add("poster_soft", function(ply, cmd, args)
 	SoftPoster(unpack(args))
 end)--, nil, nil, FCVAR_SPONLY)
 
+concommand.Add("poster_soft_v2", function(ply, cmd, args)
+	//antialias = false
+	if #args < 1 then
+		print("poster_soft_v2 <poster size> <poster split>")
+		return
+	end
+
+	SoftPosterV2(unpack(args))
+end)--, nil, nil, FCVAR_SPONLY)
+
 concommand.Add("poster_godrays", function(ply, cmd, args)
 	if #args < 2 then
 		print("poster_godrays <accuracy> <poster size> <poster split>")
@@ -748,6 +961,119 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 	RunConsoleCommand("poster", postermul, split)
 end
 
+local function LightBouncePosterV2( lightsize, lightbright, lightpasses, postermul, split, depthres )
+	local extra = extraframes:GetInt()
+	local callsleft = postermul * postermul + extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
+	local starttime = SysTime()	-- benchmarking + feedback
+
+	local amt = 0
+	for _, v in pairs(SoftLampsBounceTable) do
+		for _, _ in pairs(v) do
+			amt = amt + 1
+		end
+	end
+
+	lightpasses = math.max(lightpasses, 1)
+
+	local progressbar = {
+		{
+			title = "Poster",
+			progress = 0,
+			max = callsleft
+		},
+		{
+			title = "Bounces",
+			progress = 0,
+			max = amt
+		}
+	}
+
+
+	local PT = ProjectedTexture
+	local PTs = {}
+
+		PTs.up, PTs.dn, PTs.lt, PTs.rt, PTs.ft, PTs.bk = PT(), PT(), PT(), PT(), PT(), PT()
+
+		PTs.up:SetAngles(Angle(90, 0, 0))
+		PTs.dn:SetAngles(Angle(-90, 0, 0))
+		PTs.lt:SetAngles(Angle(0, 90, 0))
+		PTs.rt:SetAngles(Angle(0, -90, 0))
+		PTs.ft:SetAngles(Angle(0, 0, 0))
+		PTs.bk:SetAngles(Angle(0, 180, 0))
+
+	lightsize = lightsize + 0
+	for _, pt in pairs(PTs) do
+		pt:SetTexture("effects/flashlight/square")--"models/debug/debugwhite")
+		pt:SetColor(Color(255, 255, 0))
+		pt:SetBrightness((lightbright + 0)/lightpasses)	// +0 to convert from string to number
+		pt:SetEnableShadows(true)
+		pt:SetNearZ(GlobalNearZ)
+		pt:SetFarZ(lightsize + 0)	// +0 to convert from string to number
+		pt:SetFOV(98.5)	-- works well with effects/flashlight/square IIRC
+
+		-- Set proper attenuation
+		pt:SetConstantAttenuation(0)
+		pt:SetLinearAttenuation(0)
+		pt:SetQuadraticAttenuation(lightsize)
+	end
+
+	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
+		progressbar[1].progress = progressbar[1].progress + 1
+
+		i = 0
+
+		for _, lamp in pairs(ents.FindByClass("gmod_softlamp")) do
+			lamp:ClearFlashlights()
+		end
+
+		for _, PixTable in pairs(SoftLampsBounceTable) do
+			for _, bounce in pairs(PixTable) do
+				i = i + 1
+				progressbar[2].progress = i
+
+				for s = 1, lightpasses do
+					if (lightsize/s > 5) then
+						for a, pt in pairs(PTs) do
+							pt:SetColor(bounce.Col)
+							pt:SetPos(bounce.Pos)
+							pt:SetFarZ(lightsize/s)
+							pt:Update()
+						end
+
+						DoRenderV2(progressbar)
+					end
+				end
+			end
+		end
+		FinishRenderV2()
+
+		callsleft = callsleft - 1
+		if (callsleft <= 0) then
+			hook.Remove("RenderScene","SoftPoster")
+
+			for _, pt in pairs(PTs) do
+				pt:Remove()
+			end
+
+			local endtime = SysTime()
+			print("Poster finished with the following values:")
+			print("", "Render Time: ", endtime-starttime .. " seconds.")
+			print("", "Darkness: ", darken)
+			print("", "Additive: ", additive or false)
+			print("", "Anti-Aliasing: ", antialias)
+
+			if depthres then
+				print("Restoring flashlightdepthres!")
+				RunConsoleCommand("r_flashlightdepthres", depthres)
+			end
+		end
+
+		return true
+	end)
+
+	RunConsoleCommand("poster", postermul, split)
+end
+
 lightbounce_depthres = 1024
 
 concommand.Add("poster_lightbounce_depthres_override", function(ply, cmd, args)
@@ -767,5 +1093,21 @@ concommand.Add("poster_lightbounce", function(ply, cmd, args)
 	else
 		-- There used to be a 3rd argument, <lightpasses>. It has been disabled and set to always be 1.
 		LightBouncePoster(args[1], args[2], 1, args[3], args[4])
+	end
+end)--, nil, nil, FCVAR_SPONLY)
+
+concommand.Add("poster_lightbounce_v2", function(ply, cmd, args)
+	if #args < 3 then print("poster_lightbounce_v2 <lightsize> <lightbrightness> <postersize> <postersplit>") return end
+
+	local cvflashlightdepthres = GetConVar("r_flashlightdepthres")
+	local depthres = cvflashlightdepthres:GetInt()
+	if depthres != lightbounce_depthres then
+		print("r_flashlightdepthres is "..depthres.." ! Setting it to "..lightbounce_depthres.." ! Don't forget to turn off all lights before doing lightbounce")
+		RunConsoleCommand("r_flashlightdepthres", lightbounce_depthres)
+
+		LightBouncePosterV2(args[1], args[2], 1, args[3], args[4], depthres)
+	else
+		-- There used to be a 3rd argument, <lightpasses>. It has been disabled and set to always be 1.
+		LightBouncePosterV2(args[1], args[2], 1, args[3], args[4])
 	end
 end)--, nil, nil, FCVAR_SPONLY)
