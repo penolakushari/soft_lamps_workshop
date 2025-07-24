@@ -77,10 +77,10 @@ function ENT:HeavyLightStart(brightness, vlplanecount, lampcount)
 		pt:SetTexture(self:GetFlashlightTexture())
 		pt:SetNearZ(self:GetNearZ())
 		pt:SetFarZ(self:GetFarZ())
-		pt:SetFOV(self:GetLightFOV() / split) 
+		pt:SetFOV(self:GetLightFOV() / splitf)
 		pt:SetOrthographic(self:GetEnableOrthographic(), self:GetOrthoLeft() / splitf, self:GetOrthoTop() / splitf, self:GetOrthoRight() / splitf, self:GetOrthoBottom() / splitf)
 		pt:SetColor(self:GetLightColor():ToColor())
-		pt:SetBrightness(brightness)	-- brightness is dictated from outside
+		pt:SetBrightness(brightness * split^2)	-- brightness is dictated from outside
 
 		self.HeavyLightPT[i] = pt
 	end
@@ -138,6 +138,8 @@ function ENT:HeavyLightTick()
 
 			pt:SetPos(self:LocalToWorld(pos.vec))
 			pt:SetAngles(self:LocalToWorldAngles(pos.ang))
+--			pt:SetVerticalFOV(self:GetLightFOV() / (self:GetHeavySplit() / 1.16)) -- There's some issue on gmod bug tracker since 2017 which mentions differing Horizontal and Vertical FOVs breaking shadows
+--			pt:SetHorizontalFOV(self:GetLightFOV() * 0.9 / (self:GetHeavySplit() / 1.16)) -- I still experience that bug. I was so close to greatness!
 			pt:Update()
 		end
 
