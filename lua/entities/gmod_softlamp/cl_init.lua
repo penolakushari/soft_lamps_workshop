@@ -57,7 +57,7 @@ end
    Name: HeavyLightStart
    Desc: Indicates to the 
 -----------------------------------------------------------]]
-function ENT:HeavyLightStart(brightness, vlplanecount, lampcount)
+function ENT:HeavyLightStart(brightness, lampcount, vlplanecount, vlpasscount)
 	if not self.HeavyLightPT then self.HeavyLightPT = {} end
 	if not lampcount then lampcount = 1 end
 
@@ -91,27 +91,29 @@ function ENT:HeavyLightStart(brightness, vlplanecount, lampcount)
 		self.HeavyLightVLPlaneIndex = 0
 		self.HeavyLightVLPlaneMax = vlplanecount
 		self.HeavyLightVLPlanePass = 1
+		self.HeavyLightVLPPlanePassMax = vlpasscount or 1
 		self.HeavyLightVLPlane = ClientsideModel("models/vlplane/vlplane.mdl", RENDERGROUP_TRANSLUCENT)
 		self.HeavyLightVLPlane:SetNoDraw(false)--true)	-- wait until it's being activated
 		self.HeavyLightVLPlane:SetModelScale(10000)
 	else
+		self.HeavyLightVLPlanePass = nil
 		self.HeavyLightVLPlaneIndex = nil
 		self.HeavyLightVLPlaneMax = nil
 	end
 end
 
-function ENT:HeavyLightTick()
+function ENT:HeavyLightTick(viewpos)
 	local nextpos = true
 
 	if self.HeavyLightVLPlaneIndex then
 		self.HeavyLightVLPlaneIndex = self.HeavyLightVLPlaneIndex + 1
 		nextpos = self.HeavyLightIndex == 0	-- FALSE unless this is the first one. Basically a hack because I cba to restructure my code in a more logical way.
 		if self.HeavyLightVLPlaneIndex > self.HeavyLightVLPlaneMax then
-			if self.HeavyLightVLPlanePass > 1 then
+			if self.HeavyLightVLPlanePass >= self.HeavyLightVLPPlanePassMax then
 				nextpos = true
 				self.HeavyLightVLPlanePass = 1
 			else
-				self.HeavyLightVLPlanePass = 2
+				self.HeavyLightVLPlanePass = self.HeavyLightVLPlanePass + 1
 			end
 			self.HeavyLightVLPlaneIndex = 1
 		end
@@ -152,18 +154,22 @@ function ENT:HeavyLightTick()
 	end
 
 	if IsValid(self.HeavyLightVLPlane) then
-
 		local fov = self:GetLightFOV() / 2
 		local min = 1
 		local max = self.HeavyLightVLPlaneMax
 
+		local lamppos, lampang = self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles()
+		local lviewpos = WorldToLocal(viewpos, angle_zero, lamppos, lampang)
+		lviewpos.x = 0
+		local roll = lviewpos:Angle().pitch
+		local passmod = ((self.HeavyLightVLPlanePass-1) / self.HeavyLightVLPPlanePassMax)*180
+		roll = roll + passmod
+
 		local ang = math.Remap(self.HeavyLightVLPlaneIndex, min, max, -fov, fov)
 		local worldpos, worldang
-		if self.HeavyLightVLPlanePass > 1 then
-			worldpos, worldang = LocalToWorld(vector_origin, Angle(ang, 0, 90), self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles())
-		else
-			worldpos, worldang = LocalToWorld(vector_origin, Angle(0, ang, 0), self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles())
-		end
+		worldpos, worldang = LocalToWorld(vector_origin, Angle(0, 0, roll), vector_origin, lampang)
+		worldpos, worldang = LocalToWorld(vector_origin, Angle(0, ang, 0), lamppos, worldang)
+
 		--print(worldpos, worldang)
 
 		self.HeavyLightVLPlane:SetPos(worldpos)
@@ -173,7 +179,7 @@ function ENT:HeavyLightTick()
 		self.HeavyLightPT[1]:Update() --?
 	end
 
-	return true, self.HeavyLightVLPlane, self.HeavyLightVLPlaneIndex
+	return true, self.HeavyLightVLPlane, self.HeavyLightVLPlaneIndex, self.HeavyLightVLPlanePass
 end
 
 function ENT:Think()

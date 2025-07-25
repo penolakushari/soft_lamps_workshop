@@ -1,5 +1,5 @@
 --print("\tIF YOU SEE THIS TELL NEATNIT!! SoftPoster just got loaded!")
-local extraframes = CreateClientConVar("poster_extraframes", "0")
+--local extraframes = CreateClientConVar("poster_extraframes", "0")
 local lampcount = CreateClientConVar("poster_uselampcount", "1", true, false, "Soft Lamps: Amount of lamps to enable during 1 render tick", 1, 8)
 
 local tex_render = render.GetSuperFPTex()
@@ -503,8 +503,8 @@ end)
 
 
 local function SoftPoster(postermul, split)
-	local extra = extraframes:GetInt()
-	local callsleft = postermul * postermul + extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
+--	local extra = extraframes:GetInt()
+	local callsleft = postermul * postermul --+ extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
 	local starttime = SysTime()	-- benchmarking + feedback
 
 	local lights = {}
@@ -557,7 +557,7 @@ local function SoftPoster(postermul, split)
 		end
 
 		for lamp, brightness in pairs(lights) do
-			lamp:HeavyLightStart(brightness, nil, lampc)
+			lamp:HeavyLightStart(brightness, lampc)
 
 			while lamp:HeavyLightTick() do
 				i = i + lampc
@@ -586,8 +586,8 @@ local function SoftPoster(postermul, split)
 end
 
 local function SoftPosterV2(postermul, split) -- V2 versions of these things exist to be able to fuck around and find out without messing up previous use working stuff
-	local extra = extraframes:GetInt()
-	local callsleft = postermul * postermul + extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
+--	local extra = extraframes:GetInt()
+	local callsleft = postermul * postermul --+ extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
 	local starttime = SysTime()	-- benchmarking + feedback
 
 	local lights = {}
@@ -640,7 +640,7 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 		end
 
 		for lamp, brightness in pairs(lights) do
-			lamp:HeavyLightStart(brightness, nil, lampc)
+			lamp:HeavyLightStart(brightness, lampc)
 
 			while lamp:HeavyLightTick() do
 				i = i + lampc
@@ -668,10 +668,11 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 	RunConsoleCommand("poster", postermul, split)
 end
 
-local function GodRaysPoster(godrays, postermul, split, shapemem)
-	godrays = godrays + 0	-- convert to number
+local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
+	godrays = tonumber(godrays)	-- convert to number
+	passes = tonumber(passes)
 
-	local extra = extraframes:GetInt()
+--	local extra = extraframes:GetInt()
 	local callsleft = postermul * postermul	-- number of calls of the render hook that need to be hooked, 1 extra called pre-poster for some reason (not always?)
 	local starttime = SysTime()	-- benchmarking + feedback
 
@@ -721,9 +722,9 @@ local function GodRaysPoster(godrays, postermul, split, shapemem)
 			max = callsleft
 		},
 		{
-			title = "Soft Lamps",
+			title = "Passes",
 			progress = 0,
-			max = lightcount
+			max = lightcount*passes
 		},
 		{
 			title = "Godrays",
@@ -734,10 +735,10 @@ local function GodRaysPoster(godrays, postermul, split, shapemem)
 
 	local i = 0
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
-		if extra > 0 then
+--[[		if extra > 0 then
 			extra = extra - 1
 			return true
-		end
+		end]]
 		i = i + 1
 
 		progressbar[1].progress = progressbar[1].progress + 1
@@ -749,12 +750,13 @@ local function GodRaysPoster(godrays, postermul, split, shapemem)
 		local j = 0
 
 		for lamp, brightness in pairs(lights) do
-			lamp:HeavyLightStart(brightness, godrays)
+			lamp:HeavyLightStart(brightness, nil, godrays, passes)
 			j = j + 1
-			progressbar[2].progress = j
 
-			local cont, vlp, vlpindex = lamp:HeavyLightTick()
+			local cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewOrigin)
+			local lastpass
 			while cont do
+				progressbar[2].progress = j + vlpass-1
 				progressbar[3].progress = vlpindex
 
 				-- enttorender:SetLocalPos(Vector(math.Remap(vlpindex,1,vlpmax,0,100), 0, 0))
@@ -764,8 +766,10 @@ local function GodRaysPoster(godrays, postermul, split, shapemem)
 				SingleRender(vlp, progressbar, vlpindex == 1, camstarts[i])
 				-- DoRender(progressbar)
 
-				cont, vlp, vlpindex = lamp:HeavyLightTick()
+				cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewOrigin)
+				lastpass = vlpass or lastpass
 			end
+			j = j + lastpass-1
 		end
 		FinishRender(false)
 
@@ -780,9 +784,10 @@ local function GodRaysPoster(godrays, postermul, split, shapemem)
 			print("", "Additive: ", additive or false)
 			print("", "Anti-Aliasing: ", antialias)
 
-			for lamp, shapes in pairs(shapemem) do
-				print("Resetting " .. tostring(lamp) .. " Surface Shape Resolution to " .. tostring(shapes))
-				lamp:SetHeavyLayers(shapes)
+			for lamp, tab in pairs(shapemem) do
+				print("Resetting " .. tostring(lamp) .. " Surface Shape Resolution to " .. tostring(tab[1]) .. " and Lamp Split to " .. tostring(tab[2]))
+				lamp:SetHeavyLayers(tab[1])
+				lamp:SetHeavySplit(tab[2])
 			end
 		end
 
@@ -819,7 +824,7 @@ end)--, nil, nil, FCVAR_SPONLY)
 
 concommand.Add("poster_godrays", function(ply, cmd, args)
 	if #args < 2 then
-		print("poster_godrays <accuracy> <poster size> <poster split>")
+		print("poster_godrays <accuracy> <poster size> <godray passes = 1> <poster split>")
 		return
 	end
 
@@ -827,13 +832,16 @@ concommand.Add("poster_godrays", function(ply, cmd, args)
 	local softlamps = ents.FindByClass("gmod_softlamp")
 
 	for k, lamp in pairs(softlamps) do
-		if !lamp:GetHeavyOn() or lamp:GetHeavyLayers() == 1 then continue end
-		shapemem[lamp] = lamp:GetHeavyLayers()
-		print(tostring(lamp) .. " Surface Shape Resolution is set to " .. tostring(shapemem[lamp]) .. ", setting it to 1 for the godrays render")
-		lamp:SetHeavyLayers(1)
+		if !lamp:GetHeavyOn() then continue end
+		if lamp:GetHeavyLayers() ~= 1 or lamp:GetHeavySplit() ~= 1 then
+			shapemem[lamp] = {lamp:GetHeavyLayers(), lamp:GetHeavySplit()}
+			print(tostring(lamp) .. " Surface Shape Resolution is set to " .. tostring(shapemem[lamp][1]) .. " and Lamp Split is set to " .. tostring(shapemem[lamp][2]) .. ", setting them to 1 for the godrays render")
+			lamp:SetHeavyLayers(1)
+			lamp:SetHeavySplit(1)
+		end
 	end
 
-	GodRaysPoster(args[1], args[2], args[3], shapemem)
+	GodRaysPoster(args[1], args[2], args[3], args[4], shapemem)
 end)--, nil, nil, FCVAR_SPONLY)
 
 local GlobalNearZ = 5
@@ -849,8 +857,8 @@ it looks awesome :D
 --]]---------------------------
 
 local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul, split, depthres )
-	local extra = extraframes:GetInt()
-	local callsleft = postermul * postermul + extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
+--	local extra = extraframes:GetInt()
+	local callsleft = postermul * postermul --+ extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
 	local starttime = SysTime()	-- benchmarking + feedback
 
 	local amt = 0
@@ -962,8 +970,8 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 end
 
 local function LightBouncePosterV2( lightsize, lightbright, lightpasses, postermul, split, depthres )
-	local extra = extraframes:GetInt()
-	local callsleft = postermul * postermul + extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
+--	local extra = extraframes:GetInt()
+	local callsleft = postermul * postermul --+ extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
 	local starttime = SysTime()	-- benchmarking + feedback
 
 	local amt = 0
