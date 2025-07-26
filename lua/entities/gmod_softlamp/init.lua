@@ -28,6 +28,7 @@ function ENT:Initialize()
 	self:SetLightOffset( Vector(self:OBBMaxs().x, 0, 0) )
 	self:SetHeavyOn(true)
 	self:SetHeavySplit(1)
+	self:SetLinearAttenuation(100)
 end
 
 function ENT:Come()

@@ -70,6 +70,11 @@ function ENT:SetupDataTables()
 	-- Delete
 	self:NetworkVar("Bool", 8, "Delete1", { KeyName = "del", Edit = { order = orderer(), category = "Delete (select both to delete)", type = "Boolean", title = "Delete (1)" } })
 	self:NetworkVar("Bool", 9, "Delete2", { KeyName = "ete", Edit = { order = orderer(), category = "Delete (select both to delete)", type = "Boolean", title = "Delete (2)" } })
+
+	-- Extra
+	self:NetworkVar("Int",    3, "LinearAttenuation", { KeyName = "linear", 		Edit = { order = orderer(), category = "Extra", type = "Int",   title = "Linear Attenuation", min = 0, max = 100 } })
+	self:NetworkVar("Int",    4, "QuadraticAttenuation", { KeyName = "quadratic",	Edit = { order = orderer(), category = "Extra", type = "Int",   title = "Quadratic Attenuation", min = 0, max = 100 } })
+	self:NetworkVar("Int",    5, "ConstantAttenuation", { KeyName = "constant", 	Edit = { order = orderer(), category = "Extra", type = "Int",   title = "Constant Attenuation", min = 0, max = 100 } })
 end
 
 -- Everything below this point is practically only used in clientside,
