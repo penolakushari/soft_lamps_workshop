@@ -670,7 +670,7 @@ end
 
 local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 	godrays = tonumber(godrays)	-- convert to number
-	passes = tonumber(passes)
+	passes = tonumber(passes) or 1
 
 --	local extra = extraframes:GetInt()
 	local callsleft = postermul * postermul	-- number of calls of the render hook that need to be hooked, 1 extra called pre-poster for some reason (not always?)

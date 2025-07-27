@@ -94,7 +94,7 @@ function ENT:HeavyLightStart(brightness, lampcount, vlplanecount, vlpasscount)
 		self.HeavyLightVLPlaneIndex = 0
 		self.HeavyLightVLPlaneMax = vlplanecount
 		self.HeavyLightVLPlanePass = 1
-		self.HeavyLightVLPPlanePassMax = vlpasscount or 1
+		self.HeavyLightVLPPlanePassMax = vlpasscount
 		self.HeavyLightVLPlane = ClientsideModel("models/vlplane/vlplane.mdl", RENDERGROUP_TRANSLUCENT)
 		self.HeavyLightVLPlane:SetNoDraw(false)--true)	-- wait until it's being activated
 		self.HeavyLightVLPlane:SetModelScale(10000)
