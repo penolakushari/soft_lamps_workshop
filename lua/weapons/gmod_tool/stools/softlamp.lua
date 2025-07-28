@@ -1,10 +1,124 @@
 AddCSLuaFile()
 require("vectorshapes")
 
+-- Preset storage (clientside only)
+if CLIENT then
+	SoftLampPresets = SoftLampPresets or {}
+
+	-- Load presets from file
+	local function LoadPresets()
+		if file.Exists("softlamp_presets.txt", "DATA") then
+			local data = file.Read("softlamp_presets.txt", "DATA")
+			if data then
+				local decoded = util.JSONToTable(data)
+				if decoded then
+					SoftLampPresets = decoded
+				end
+			end
+		end
+	end
+
+	-- Save presets to file
+	local function SavePresets()
+		local encoded = util.TableToJSON(SoftLampPresets)
+		if encoded then
+			file.Write("softlamp_presets.txt", encoded)
+		end
+	end
+
+	-- Initialize presets
+	LoadPresets()
+
+	-- Function to save current tool settings as preset
+	local function SavePreset(name)
+		if not name or name == "" then return end
+
+		local tool = LocalPlayer():GetTool("softlamp")
+		if not tool then return end
+
+		SoftLampPresets[name] = {
+			r = tool:GetClientNumber("r"),
+			g = tool:GetClientNumber("g"),
+			b = tool:GetClientNumber("b"),
+			fov = tool:GetClientNumber("fov"),
+			distance = tool:GetClientNumber("distance"),
+			nearz = tool:GetClientNumber("nearz"),
+			brightness = tool:GetClientNumber("brightness"),
+			texture = tool:GetClientInfo("texture"),
+			model = tool:GetClientInfo("model"),
+			toggle = tool:GetClientNumber("toggle"),
+			on = tool:GetClientNumber("on"),
+			orthoon = tool:GetClientNumber("orthoon"),
+			orthosize = tool:GetClientNumber("orthosize"),
+			shape = tool:GetClientInfo("shape"),
+			radius = tool:GetClientNumber("radius"),
+			layers = tool:GetClientNumber("layers")
+		}
+
+		SavePresets()
+	end
+
+	-- Function to load preset
+	local function LoadPreset(name)
+		if not SoftLampPresets[name] then return end
+
+		local preset = SoftLampPresets[name]
+
+		-- Load basic tool settings (these work with the Q menu)
+		LocalPlayer():ConCommand("softlamp_r " .. (preset.r or 255))
+		LocalPlayer():ConCommand("softlamp_g " .. (preset.g or 255))
+		LocalPlayer():ConCommand("softlamp_b " .. (preset.b or 255))
+		LocalPlayer():ConCommand("softlamp_fov " .. (preset.fov or 90))
+		LocalPlayer():ConCommand("softlamp_distance " .. (preset.distance or 1024))
+		LocalPlayer():ConCommand("softlamp_nearz " .. (preset.nearz or 12))
+		LocalPlayer():ConCommand("softlamp_brightness " .. (preset.brightness or 4))
+		LocalPlayer():ConCommand("softlamp_texture " .. (preset.texture or "models/debug/debugwhite"))
+		LocalPlayer():ConCommand("softlamp_model " .. (preset.model or "models/lamps/torch.mdl"))
+		LocalPlayer():ConCommand("softlamp_toggle " .. (preset.toggle or 1))
+		LocalPlayer():ConCommand("softlamp_on " .. (preset.on or 1))
+
+		-- Load orthographic settings (use new format if available, fall back to legacy)
+		LocalPlayer():ConCommand("softlamp_orthoon " .. (preset.orthoon or 0))
+		LocalPlayer():ConCommand("softlamp_orthosize " .. (preset.ortho_left or preset.orthosize or 512))
+
+		-- Load shape settings (use new format if available, fall back to legacy)
+		LocalPlayer():ConCommand("softlamp_shape " .. (preset.heavy_shape or preset.shape or "square"))
+		LocalPlayer():ConCommand("softlamp_radius " .. (preset.shape_radius or preset.radius or 10))
+		LocalPlayer():ConCommand("softlamp_layers " .. (preset.gameplay_layers or preset.layers or 1))
+	end
+
+	-- Function to delete preset
+	local function DeletePreset(name)
+		if SoftLampPresets[name] then
+			SoftLampPresets[name] = nil
+			SavePresets()
+		end
+	end
+
+	-- Console commands for preset management
+	concommand.Add("softlamp_save_preset", function(ply, cmd, args)
+		if args[1] then
+			SavePreset(args[1])
+		end
+	end)
+
+	concommand.Add("softlamp_load_preset", function(ply, cmd, args)
+		if args[1] then
+			LoadPreset(args[1])
+		end
+	end)
+
+	concommand.Add("softlamp_delete_preset", function(ply, cmd, args)
+		if args[1] then
+			DeletePreset(args[1])
+		end
+	end)
+end
+
 if CLIENT then
 	language.Add( "tool.softlamp.name",				"Soft Lamps" )
 	language.Add( "tool.softlamp.desc",				"Soft Projected lights" )
-	language.Add( "tool.softlamp.0",				"Click anywhere to create a soft lamp. Click on a soft lamp to update it. Right-click on a lamp or soft lamp to copy its settings." )
+	language.Add( "tool.softlamp.0",				"Click anywhere to create a soft lamp. Click on a soft lamp to update it. Right-click on a lamp or soft lamp to copy its settings. Hold C on a lamp to save as preset, or right-click → 'Save as Preset'." )
 	language.Add( "tool.softlamp.fov",				"FOV:" )
 	language.Add( "tool.softlamp.distance",			"Distance (Far Z):" )
 	language.Add( "tool.softlamp.nearz",			"Near Z:" )
@@ -25,6 +139,11 @@ if CLIENT then
 	language.Add( "tool.softlamp.ortho_size",		"Orthographic size:" )
   
 	language.Add( "lamptexture.debug",				"Debug White" )
+	
+	-- Preset language entries
+	language.Add( "tool.softlamp.presets",			"Presets:" )
+	language.Add( "tool.softlamp.preset_save",		"Save Current as Preset" )
+	language.Add( "tool.softlamp.preset_name",		"Preset Name:" )
 end
 
 TOOL.Category = "Construction"
@@ -230,6 +349,87 @@ function TOOL:RightClick( trace )
 	return true
 end
 
+-- Add USE key functionality for saving presets from existing lamps
+function TOOL:Deploy()
+	if CLIENT then
+		-- Reset to default values on first deployment of the session
+		if not self.HasBeenDeployedThisSession then
+			self.HasBeenDeployedThisSession = true
+
+			-- Reset all ConVars to their default values
+			LocalPlayer():ConCommand("softlamp_r 255")
+			LocalPlayer():ConCommand("softlamp_g 255")
+			LocalPlayer():ConCommand("softlamp_b 255")
+			LocalPlayer():ConCommand("softlamp_key -1")
+			LocalPlayer():ConCommand("softlamp_fov 90")
+			LocalPlayer():ConCommand("softlamp_distance 1024")
+			LocalPlayer():ConCommand("softlamp_nearz 12")
+			LocalPlayer():ConCommand("softlamp_brightness 4")
+			LocalPlayer():ConCommand("softlamp_texture models/debug/debugwhite")
+			LocalPlayer():ConCommand("softlamp_model models/lamps/torch.mdl")
+			LocalPlayer():ConCommand("softlamp_toggle 1")
+			LocalPlayer():ConCommand("softlamp_on 1")
+			LocalPlayer():ConCommand("softlamp_orthoon 0")
+			LocalPlayer():ConCommand("softlamp_orthosize 512")
+			LocalPlayer():ConCommand("softlamp_shape " .. next(vectorshapes.GetShapes(), nil))
+			LocalPlayer():ConCommand("softlamp_radius 10")
+			LocalPlayer():ConCommand("softlamp_layers 1")
+
+		end
+		-- Hook C key when tool is equipped
+		self.UseHook = function(ply, key)
+			if key == KEY_C and ply:GetTool() and ply:GetTool():GetClass() == "gmod_tool" and ply:GetTool():GetMode() == "softlamp" then
+				local trace = ply:GetEyeTrace()
+				if IsValid(trace.Entity) and trace.Entity:GetClass() == "gmod_softlamp" and trace.HitPos:Distance(ply:EyePos()) <= 100 then
+					-- Copy lamp settings to current tool settings first
+					ply:ConCommand( "softlamp_fov " .. trace.Entity:GetLightFOV() )
+					ply:ConCommand( "softlamp_distance " .. trace.Entity:GetDistance() )
+					ply:ConCommand( "softlamp_brightness " .. trace.Entity:GetBrightness() )
+					ply:ConCommand( "softlamp_texture " .. trace.Entity:GetFlashlightTexture() )
+					ply:ConCommand( "softlamp_nearz " .. trace.Entity:GetNearZ() )
+					ply:ConCommand( "softlamp_shape " .. trace.Entity:GetHeavyShape() )
+					ply:ConCommand( "softlamp_radius " .. trace.Entity:GetShapeRadius() )
+					ply:ConCommand( "softlamp_layers " .. trace.Entity:GetGameplayLayers() )
+					ply:ConCommand( "softlamp_orthoon " .. (trace.Entity:GetEnableOrthographic() and "1" or "0") )
+					ply:ConCommand( "softlamp_orthosize " .. trace.Entity:GetOrthoLeft() )
+					ply:ConCommand( "softlamp_toggle " .. (trace.Entity:GetToggle() and "1" or "0") )
+					ply:ConCommand( "softlamp_on " .. (trace.Entity:GetOn() and "1" or "0") )
+
+					local clr = trace.Entity:GetLightColor()
+					ply:ConCommand( "softlamp_r " .. math.floor(clr.r * 255) )
+					ply:ConCommand( "softlamp_g " .. math.floor(clr.g * 255) )
+					ply:ConCommand( "softlamp_b " .. math.floor(clr.b * 255) )
+
+					-- Prompt for preset name
+					Derma_StringRequest(
+						"Save Lamp as Preset",
+						"Enter a name for this preset:",
+						"",
+						function( text )
+							if text and text ~= "" then
+								timer.Simple(0.1, function() -- Small delay to ensure ConCommands are processed
+									RunConsoleCommand("softlamp_save_preset", text)
+								end)
+							end
+						end,
+						nil
+					)
+					return true
+				end
+			end
+		end
+
+		hook.Add("PlayerButtonDown", "SoftLampPresetSave", self.UseHook)
+	end
+end
+
+function TOOL:Holster()
+	if CLIENT and self.UseHook then
+		hook.Remove("PlayerButtonDown", "SoftLampPresetSave")
+		self.UseHook = nil
+	end
+end
+
 if ( SERVER ) then
 	function MakeSoftLamp(pl, r, g, b, KeyDown, toggle, Texture, Model, fov, distance, nearz, brightness, on, SoftShape, SoftRadius, SoftLayers, Data, OrthoOn, OrthoSize)
 
@@ -418,6 +618,72 @@ function TOOL.BuildCPanel( CPanel )
 
 	CPanel:CheckBox("#tool.softlamp.ortho_on", "softlamp_orthoon")
 	CPanel:NumSlider("#tool.softlamp.ortho_size", "softlamp_orthosize", 0, 2048)
+
+	-- Preset Management Section
+	CPanel:Help("Presets: Use C key or right-click entity → 'Save as Preset' to save. Right-click entity → 'Load Preset' to apply complete settings to existing lamps. Double-click preset to load in tool.")
+
+	-- Preset List
+	local presetList = vgui.Create("DListView")
+	presetList:SetMultiSelect(false)
+	presetList:AddColumn("Preset Name")
+	presetList:SetTall(100)
+
+	-- Function to refresh preset list
+	local function RefreshPresetList()
+		presetList:Clear()
+		for name, data in pairs(SoftLampPresets or {}) do
+			presetList:AddLine(name)
+		end
+	end
+
+	-- Load preset on double-click
+	presetList.OnRowSelected = function(panel, rowIndex, row)
+		local name = row:GetColumnText(1)
+		if name then
+			RunConsoleCommand("softlamp_load_preset", name)
+		end
+	end
+
+	-- Right-click context menu for deletion
+	presetList.OnRowRightClick = function(panel, rowIndex, row)
+		local name = row:GetColumnText(1)
+		if name then
+			local menu = DermaMenu()
+			menu:AddOption("Delete Preset", function()
+				Derma_Query(
+					"Are you sure you want to delete preset '" .. name .. "'?",
+					"Delete Preset",
+					"Delete",
+					function()
+						RunConsoleCommand("softlamp_delete_preset", name)
+						timer.Simple(0.1, RefreshPresetList)
+					end,
+					"Cancel"
+				)
+			end)
+			menu:Open()
+		end
+	end
+
+	CPanel:AddItem(presetList)
+
+
+
+	-- Initial refresh
+	RefreshPresetList()
+
+	-- Refresh list when presets are modified
+	local oldThink = CPanel.Think
+	CPanel.Think = function(self)
+		if oldThink then oldThink(self) end
+
+		-- Check if we need to refresh (simple check every second)
+		if not self.NextPresetRefresh then self.NextPresetRefresh = 0 end
+		if CurTime() > self.NextPresetRefresh then
+			RefreshPresetList()
+			self.NextPresetRefresh = CurTime() + 1
+		end
+	end
 end
 
 list.Set( "LampTextures", "models/debug/debugwhite", { Name = "#lamptexture.debug" } )

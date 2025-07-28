@@ -281,3 +281,364 @@ end
 function ENT:OnRemove()
 	self:ClearFlashlights()
 end
+
+-- Add custom context menu option for saving presets
+-- Initialize preset system
+SoftLampPresets = SoftLampPresets or {}
+
+-- Load presets from file if not already loaded
+if not SoftLampPresets.loaded then
+	if file.Exists("softlamp_presets.txt", "DATA") then
+		local data = file.Read("softlamp_presets.txt", "DATA")
+		if data then
+			local decoded = util.JSONToTable(data)
+			if decoded then
+				for k, v in pairs(decoded) do
+					SoftLampPresets[k] = v
+				end
+			end
+		end
+	end
+	SoftLampPresets.loaded = true
+end
+
+-- Function to save preset from entity (capturing ALL entity settings)
+local function SaveEntityAsPreset(entity, name)
+	if not name or name == "" or not IsValid(entity) then return end
+
+	local clr = entity:GetLightColor()
+	local offset = entity:GetLightOffset()
+
+	-- Debug: Print what we're saving
+
+
+	SoftLampPresets[name] = {
+		-- Basic tool settings
+		r = math.floor(clr.r * 255),
+		g = math.floor(clr.g * 255),
+		b = math.floor(clr.b * 255),
+		fov = entity:GetLightFOV(),
+		distance = entity:GetFarZ(),
+		nearz = entity:GetNearZ(),
+		brightness = entity:GetBrightness(),
+		texture = entity:GetFlashlightTexture(),
+		model = entity:GetModel(),
+		toggle = entity:GetToggle() and 1 or 0,
+		on = entity:GetOn() and 1 or 0,
+
+		-- Lamp settings (from entity edit menu)
+		lightoffset_x = offset.x,
+		lightoffset_y = offset.y,
+		lightoffset_z = offset.z,
+		focaldistance = entity:GetFocalDistance(),
+		linear = entity:GetLinearAttenuation(),
+		quadratic = entity:GetQuadraticAttenuation(),
+		constant = entity:GetConstantAttenuation(),
+
+		-- Orthographic settings (complete)
+		orthoon = entity:GetEnableOrthographic() and 1 or 0,
+		ortho_left = entity:GetOrthoLeft(),
+		ortho_top = entity:GetOrthoTop(),
+		ortho_right = entity:GetOrthoRight(),
+		ortho_bottom = entity:GetOrthoBottom(),
+
+		-- HeavyLight settings
+		heavy_on = entity:GetHeavyOn() and 1 or 0,
+		heavy_shape = entity:GetHeavyShape(),
+		shape_radius = entity:GetShapeRadius(),
+		heavy_layers = entity:GetHeavyLayers(),
+		heavy_split = entity:GetHeavySplit(),
+
+		-- Gameplay settings (make sure we get the actual on state)
+		gameplay_on = entity:GetOn() and 1 or 0,
+		gameplay_shape = entity:GetGameplayShape(),
+		gameplay_layers = entity:GetGameplayLayers(),
+
+		-- Visualization settings
+		preview_poster = entity:GetPreviewPoster() and 1 or 0,
+		preview_points = entity:GetPreviewPoints() and 1 or 0,
+		preview_safearea = entity:GetPreviewSafeArea() and 1 or 0,
+		preview_ignorez = entity:GetPreviewIgnoreZ() and 1 or 0,
+
+		-- Legacy compatibility (keep old names for backward compatibility)
+		orthosize = entity:GetOrthoLeft(),
+		shape = entity:GetHeavyShape(),
+		radius = entity:GetShapeRadius(),
+		layers = entity:GetGameplayLayers()
+	}
+
+	-- Debug: Print what we saved
+	-- Save to file
+	local encoded = util.TableToJSON(SoftLampPresets)
+	if encoded then
+		file.Write("softlamp_presets.txt", encoded)
+	end
+end
+
+-- Function to apply preset settings to entity
+local function ApplyPresetSettings(entity, preset)
+	if not IsValid(entity) or not preset then return end
+
+	-- Apply settings using the NetworkVar setters
+	-- Basic lamp settings
+	if preset.r then 
+		entity:SetLightColor(Vector(preset.r/255, (preset.g or 255)/255, (preset.b or 255)/255))
+	end
+	if preset.brightness then entity:SetBrightness(preset.brightness) end
+	if preset.fov then entity:SetLightFOV(preset.fov) end
+	if preset.distance then entity:SetFarZ(preset.distance) end
+	if preset.nearz then entity:SetNearZ(preset.nearz) end
+	if preset.texture then entity:SetFlashlightTexture(preset.texture) end
+	if preset.toggle ~= nil then entity:SetToggle(preset.toggle == 1) end
+
+	-- Lamp offset
+	if preset.lightoffset_x then
+		entity:SetLightOffset(Vector(preset.lightoffset_x, preset.lightoffset_y, preset.lightoffset_z))
+	end
+
+	-- Focal distance
+	if preset.focaldistance then
+		entity:SetFocalDistance(preset.focaldistance)
+	end
+
+	-- Attenuations
+	if preset.linear then
+		entity:SetLinearAttenuation(preset.linear)
+	end
+	if preset.quadratic then
+		entity:SetQuadraticAttenuation(preset.quadratic)
+	end
+	if preset.constant then
+		entity:SetConstantAttenuation(preset.constant)
+	end
+
+	-- Orthographic settings
+	if preset.orthoon ~= nil then
+		entity:SetEnableOrthographic(preset.orthoon == 1)
+	end
+	if preset.ortho_left then
+		entity:SetOrthoLeft(preset.ortho_left)
+		entity:SetOrthoTop(preset.ortho_top or preset.ortho_left)
+		entity:SetOrthoRight(preset.ortho_right or preset.ortho_left)
+		entity:SetOrthoBottom(preset.ortho_bottom or preset.ortho_left)
+	end
+
+	-- HeavyLight settings
+	if preset.heavy_on ~= nil then
+		entity:SetHeavyOn(preset.heavy_on == 1)
+	end
+	if preset.heavy_shape then
+		entity:SetHeavyShape(preset.heavy_shape)
+	end
+	if preset.shape_radius then
+		entity:SetShapeRadius(preset.shape_radius)
+	end
+	if preset.heavy_layers then
+		entity:SetHeavyLayers(preset.heavy_layers)
+	end
+	if preset.heavy_split then
+		entity:SetHeavySplit(preset.heavy_split)
+	end
+
+	-- Gameplay settings
+	if preset.gameplay_on ~= nil then
+		entity:SetOn(preset.gameplay_on == 1)
+	end
+	if preset.gameplay_shape and preset.gameplay_shape ~= "" then
+		entity:SetGameplayShape(preset.gameplay_shape)
+	end
+	if preset.gameplay_layers then
+		entity:SetGameplayLayers(preset.gameplay_layers)
+	end
+
+	-- Visualization settings
+	if preset.preview_poster ~= nil then
+		entity:SetPreviewPoster(preset.preview_poster == 1)
+	end
+	if preset.preview_points ~= nil then
+		entity:SetPreviewPoints(preset.preview_points == 1)
+	end
+	if preset.preview_safearea ~= nil then
+		entity:SetPreviewSafeArea(preset.preview_safearea == 1)
+	end
+	if preset.preview_ignorez ~= nil then
+		entity:SetPreviewIgnoreZ(preset.preview_ignorez == 1)
+	end
+end
+
+-- Function to load preset to entity (applying ALL settings)
+local function LoadPresetToEntity(entity, preset)
+	if not IsValid(entity) or not preset then return end
+
+	-- Always send to server, even in singleplayer
+	-- This ensures the edit properties dialog sees the correct values
+	net.Start("SoftLampLoadPreset")
+		net.WriteEntity(entity)
+		net.WriteTable(preset)
+	net.SendToServer()
+end
+
+-- Client receives confirmation
+net.Receive("SoftLampPresetLoaded", function()
+	local entity = net.ReadEntity()
+end)
+
+-- Add context menu using PostDrawOpaqueRenderables hook to catch context menu
+hook.Add("PostDrawOpaqueRenderables", "SoftLampContextMenuSetup", function()
+	-- This runs every frame, but we'll use it to set up our context menu hook
+	if not hook.GetTable()["OnSpawnMenuOpen"] or not hook.GetTable()["OnSpawnMenuOpen"]["SoftLampContextMenuChecker"] then
+		hook.Add("OnSpawnMenuOpen", "SoftLampContextMenuChecker", function()
+			-- This approach might work better
+		end)
+	end
+end)
+
+-- Try the correct context menu hook approach
+local function SetupContextMenu()
+	-- Override the default context menu behavior for our entity
+	local oldEntityMenu = properties.GetHovered
+	properties.GetHovered = function(pos, ent)
+		local tr = util.TraceLine({
+			start = pos,
+			endpos = pos + gui.ScreenToVector(ScrW()/2, ScrH()/2) * 32768,
+			filter = LocalPlayer()
+		})
+		
+		if IsValid(tr.Entity) and tr.Entity:GetClass() == "gmod_softlamp" then
+			-- Store the entity for our context menu
+			SoftLampContextEntity = tr.Entity
+		end
+		
+		return oldEntityMenu(pos, ent)
+	end
+end
+
+-- Setup when the entity initializes
+timer.Simple(0.1, SetupContextMenu)
+
+-- Add the context menu options via properties system
+if not properties.List["softlamp_save_preset"] then
+	properties.Add("softlamp_save_preset", {
+		MenuLabel = "Save as Preset",
+		Order = 9998,
+		MenuIcon = "icon16/disk.png",
+		Filter = function(self, ent, ply)
+			return ent:GetClass() == "gmod_softlamp"
+		end,
+		Action = function(self, ent)
+			Derma_StringRequest(
+				"Save Lamp as Preset",
+				"Enter a name for this preset (will save current lamp properties):",
+				"",
+				function( text )
+					if text and text ~= "" then
+						SaveEntityAsPreset(ent, text)
+					end
+				end,
+				nil
+			)
+		end
+	})
+end
+
+if not properties.List["softlamp_load_preset"] then
+	properties.Add("softlamp_load_preset", {
+		MenuLabel = "Load Preset",
+		Order = 9999,
+		MenuIcon = "icon16/folder_go.png",
+		Filter = function(self, ent, ply)
+			if ent:GetClass() ~= "gmod_softlamp" then return false end
+
+			-- Count actual presets (excluding the "loaded" flag)
+			local presetCount = 0
+			for name, preset in pairs(SoftLampPresets or {}) do
+				if name ~= "loaded" then
+					presetCount = presetCount + 1
+				end
+			end
+			return presetCount > 0
+		end,
+		Action = function(self, ent)
+			-- Create a selection dialog with all available presets
+			local frame = vgui.Create("DFrame")
+			frame:SetSize(300, 400)
+			frame:SetTitle("Load Preset")
+			frame:Center()
+			frame:MakePopup()
+			frame:ShowCloseButton(true)
+			frame:SetDeleteOnClose(true)
+			frame:SetSizable(false)
+			frame:SetDraggable(true)
+
+			-- Prevent clicks from passing through to the game world
+			frame:SetMouseInputEnabled(true)
+			frame:SetKeyboardInputEnabled(true)
+
+			local list = vgui.Create("DListView", frame)
+			list:Dock(FILL)
+			list:SetMultiSelect(false)
+			list:AddColumn("Preset Name")
+			list:SetMouseInputEnabled(true)
+
+			-- Add all presets to the list
+			local presetCount = 0
+			for name, preset in pairs(SoftLampPresets or {}) do
+				if name ~= "loaded" then
+					list:AddLine(name)
+					presetCount = presetCount + 1
+				end
+			end
+
+			if presetCount == 0 then
+				frame:Close()
+				chat.AddText(Color(255, 100, 100), "[Soft Lamps] ", Color(255, 255, 255), "No presets available to load!")
+				return
+			end
+
+			-- Handle selection
+			list.OnRowSelected = function(panel, rowIndex, row)
+				local presetName = row:GetColumnText(1)
+				if presetName and SoftLampPresets[presetName] then
+					-- Prevent click from interfering with tool/game world
+					input.SetCursorPos(ScrW()/2, ScrH()/2)
+					gui.EnableScreenClicker(false)
+
+					LoadPresetToEntity(ent, SoftLampPresets[presetName])
+					frame:Close()
+				end
+			end
+
+			-- Add load button
+			local loadButton = vgui.Create("DButton", frame)
+			loadButton:SetText("Load Selected Preset")
+			loadButton:Dock(BOTTOM)
+			loadButton:SetTall(30)
+			loadButton:SetMouseInputEnabled(true)
+			loadButton.DoClick = function()
+				-- Prevent click from passing through to the game world
+				input.SetCursorPos(ScrW()/2, ScrH()/2)
+				gui.EnableScreenClicker(false)
+
+				local selected = list:GetSelectedLine()
+				if selected then
+					local line = list:GetLine(selected)
+					local presetName = line:GetColumnText(1)
+					if presetName and SoftLampPresets[presetName] then
+						LoadPresetToEntity(ent, SoftLampPresets[presetName])
+						frame:Close()
+					end
+				else
+					chat.AddText(Color(255, 100, 100), "[Soft Lamps] ", Color(255, 255, 255), "Please select a preset first!")
+				end
+			end
+			
+			-- Add help text
+			local helpLabel = vgui.Create("DLabel", frame)
+			helpLabel:SetText("Double-click or select and click 'Load' to apply preset")
+			helpLabel:Dock(BOTTOM)
+			helpLabel:SetTall(20)
+			helpLabel:SetContentAlignment(5) -- Center
+			helpLabel:SetTextColor(Color(100, 100, 100))
+		end
+	})
+end
