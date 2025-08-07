@@ -52,11 +52,12 @@ if SERVER then
 		if preset.orthoon ~= nil then
 			entity:SetEnableOrthographic(preset.orthoon == 1)
 		end
-		if preset.ortho_left then
-			entity:SetOrthoLeft(preset.ortho_left)
-			entity:SetOrthoTop(preset.ortho_top or preset.ortho_left)
-			entity:SetOrthoRight(preset.ortho_right or preset.ortho_left)
-			entity:SetOrthoBottom(preset.ortho_bottom or preset.ortho_left)
+		if preset.ortho_left or preset.orthosize then
+			local orthoSize = preset.ortho_left or preset.orthosize
+			entity:SetOrthoLeft(orthoSize)
+			entity:SetOrthoTop(preset.ortho_top or orthoSize)
+			entity:SetOrthoRight(preset.ortho_right or orthoSize)
+			entity:SetOrthoBottom(preset.ortho_bottom or orthoSize)
 		end
 
 		-- HeavyLight settings

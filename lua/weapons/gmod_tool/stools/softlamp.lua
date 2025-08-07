@@ -5,29 +5,14 @@ require("vectorshapes")
 if CLIENT then
 	SoftLampPresets = SoftLampPresets or {}
 
-	-- Load presets from file
-	local function LoadPresets()
-		if file.Exists("softlamp_presets.txt", "DATA") then
-			local data = file.Read("softlamp_presets.txt", "DATA")
-			if data then
-				local decoded = util.JSONToTable(data)
-				if decoded then
-					SoftLampPresets = decoded
-				end
-			end
-		end
-	end
-
 	-- Save presets to file
 	local function SavePresets()
 		local encoded = util.TableToJSON(SoftLampPresets)
 		if encoded then
 			file.Write("softlamp_presets.txt", encoded)
 		end
+		hook.Run("SoftLampPresetChanged")
 	end
-
-	-- Initialize presets
-	LoadPresets()
 
 	-- Function to save current tool settings as preset
 	local function SavePreset(name)
@@ -349,87 +334,6 @@ function TOOL:RightClick( trace )
 	return true
 end
 
--- Add USE key functionality for saving presets from existing lamps
-function TOOL:Deploy()
-	if CLIENT then
-		-- Reset to default values on first deployment of the session
-		if not self.HasBeenDeployedThisSession then
-			self.HasBeenDeployedThisSession = true
-
-			-- Reset all ConVars to their default values
-			LocalPlayer():ConCommand("softlamp_r 255")
-			LocalPlayer():ConCommand("softlamp_g 255")
-			LocalPlayer():ConCommand("softlamp_b 255")
-			LocalPlayer():ConCommand("softlamp_key -1")
-			LocalPlayer():ConCommand("softlamp_fov 90")
-			LocalPlayer():ConCommand("softlamp_distance 1024")
-			LocalPlayer():ConCommand("softlamp_nearz 12")
-			LocalPlayer():ConCommand("softlamp_brightness 4")
-			LocalPlayer():ConCommand("softlamp_texture models/debug/debugwhite")
-			LocalPlayer():ConCommand("softlamp_model models/lamps/torch.mdl")
-			LocalPlayer():ConCommand("softlamp_toggle 1")
-			LocalPlayer():ConCommand("softlamp_on 1")
-			LocalPlayer():ConCommand("softlamp_orthoon 0")
-			LocalPlayer():ConCommand("softlamp_orthosize 512")
-			LocalPlayer():ConCommand("softlamp_shape " .. next(vectorshapes.GetShapes(), nil))
-			LocalPlayer():ConCommand("softlamp_radius 10")
-			LocalPlayer():ConCommand("softlamp_layers 1")
-
-		end
-		-- Hook C key when tool is equipped
-		self.UseHook = function(ply, key)
-			if key == KEY_C and ply:GetTool() and ply:GetTool():GetClass() == "gmod_tool" and ply:GetTool():GetMode() == "softlamp" then
-				local trace = ply:GetEyeTrace()
-				if IsValid(trace.Entity) and trace.Entity:GetClass() == "gmod_softlamp" and trace.HitPos:Distance(ply:EyePos()) <= 100 then
-					-- Copy lamp settings to current tool settings first
-					ply:ConCommand( "softlamp_fov " .. trace.Entity:GetLightFOV() )
-					ply:ConCommand( "softlamp_distance " .. trace.Entity:GetDistance() )
-					ply:ConCommand( "softlamp_brightness " .. trace.Entity:GetBrightness() )
-					ply:ConCommand( "softlamp_texture " .. trace.Entity:GetFlashlightTexture() )
-					ply:ConCommand( "softlamp_nearz " .. trace.Entity:GetNearZ() )
-					ply:ConCommand( "softlamp_shape " .. trace.Entity:GetHeavyShape() )
-					ply:ConCommand( "softlamp_radius " .. trace.Entity:GetShapeRadius() )
-					ply:ConCommand( "softlamp_layers " .. trace.Entity:GetGameplayLayers() )
-					ply:ConCommand( "softlamp_orthoon " .. (trace.Entity:GetEnableOrthographic() and "1" or "0") )
-					ply:ConCommand( "softlamp_orthosize " .. trace.Entity:GetOrthoLeft() )
-					ply:ConCommand( "softlamp_toggle " .. (trace.Entity:GetToggle() and "1" or "0") )
-					ply:ConCommand( "softlamp_on " .. (trace.Entity:GetOn() and "1" or "0") )
-
-					local clr = trace.Entity:GetLightColor()
-					ply:ConCommand( "softlamp_r " .. math.floor(clr.r * 255) )
-					ply:ConCommand( "softlamp_g " .. math.floor(clr.g * 255) )
-					ply:ConCommand( "softlamp_b " .. math.floor(clr.b * 255) )
-
-					-- Prompt for preset name
-					Derma_StringRequest(
-						"Save Lamp as Preset",
-						"Enter a name for this preset:",
-						"",
-						function( text )
-							if text and text ~= "" then
-								timer.Simple(0.1, function() -- Small delay to ensure ConCommands are processed
-									RunConsoleCommand("softlamp_save_preset", text)
-								end)
-							end
-						end,
-						nil
-					)
-					return true
-				end
-			end
-		end
-
-		hook.Add("PlayerButtonDown", "SoftLampPresetSave", self.UseHook)
-	end
-end
-
-function TOOL:Holster()
-	if CLIENT and self.UseHook then
-		hook.Remove("PlayerButtonDown", "SoftLampPresetSave")
-		self.UseHook = nil
-	end
-end
-
 if ( SERVER ) then
 	function MakeSoftLamp(pl, r, g, b, KeyDown, toggle, Texture, Model, fov, distance, nearz, brightness, on, SoftShape, SoftRadius, SoftLayers, Data, OrthoOn, OrthoSize)
 
@@ -620,7 +524,7 @@ function TOOL.BuildCPanel( CPanel )
 	CPanel:NumSlider("#tool.softlamp.ortho_size", "softlamp_orthosize", 0, 2048)
 
 	-- Preset Management Section
-	CPanel:Help("Presets: Use C key or right-click entity → 'Save as Preset' to save. Right-click entity → 'Load Preset' to apply complete settings to existing lamps. Double-click preset to load in tool.")
+	CPanel:Help("Presets: Use C key and right-click entity → 'Save as Preset' to save. Right-click entity → 'Load Preset' to apply complete settings to existing lamps. Double-click preset to load in tool.")
 
 	-- Preset List
 	local presetList = vgui.Create("DListView")
@@ -632,6 +536,7 @@ function TOOL.BuildCPanel( CPanel )
 	local function RefreshPresetList()
 		presetList:Clear()
 		for name, data in pairs(SoftLampPresets or {}) do
+			if name == "loaded" then continue end
 			presetList:AddLine(name)
 		end
 	end
@@ -656,7 +561,6 @@ function TOOL.BuildCPanel( CPanel )
 					"Delete",
 					function()
 						RunConsoleCommand("softlamp_delete_preset", name)
-						timer.Simple(0.1, RefreshPresetList)
 					end,
 					"Cancel"
 				)
@@ -673,17 +577,10 @@ function TOOL.BuildCPanel( CPanel )
 	RefreshPresetList()
 
 	-- Refresh list when presets are modified
-	local oldThink = CPanel.Think
-	CPanel.Think = function(self)
-		if oldThink then oldThink(self) end
+	hook.Add("SoftLampPresetChanged", "SoftLampPresetsRefresh", function()
+		RefreshPresetList()
+	end)
 
-		-- Check if we need to refresh (simple check every second)
-		if not self.NextPresetRefresh then self.NextPresetRefresh = 0 end
-		if CurTime() > self.NextPresetRefresh then
-			RefreshPresetList()
-			self.NextPresetRefresh = CurTime() + 1
-		end
-	end
 end
 
 list.Set( "LampTextures", "models/debug/debugwhite", { Name = "#lamptexture.debug" } )

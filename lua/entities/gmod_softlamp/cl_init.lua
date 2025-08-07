@@ -282,25 +282,7 @@ function ENT:OnRemove()
 	self:ClearFlashlights()
 end
 
--- Add custom context menu option for saving presets
--- Initialize preset system
 SoftLampPresets = SoftLampPresets or {}
-
--- Load presets from file if not already loaded
-if not SoftLampPresets.loaded then
-	if file.Exists("softlamp_presets.txt", "DATA") then
-		local data = file.Read("softlamp_presets.txt", "DATA")
-		if data then
-			local decoded = util.JSONToTable(data)
-			if decoded then
-				for k, v in pairs(decoded) do
-					SoftLampPresets[k] = v
-				end
-			end
-		end
-	end
-	SoftLampPresets.loaded = true
-end
 
 -- Function to save preset from entity (capturing ALL entity settings)
 local function SaveEntityAsPreset(entity, name)
@@ -308,8 +290,6 @@ local function SaveEntityAsPreset(entity, name)
 
 	local clr = entity:GetLightColor()
 	local offset = entity:GetLightOffset()
-
-	-- Debug: Print what we're saving
 
 
 	SoftLampPresets[name] = {
@@ -367,103 +347,12 @@ local function SaveEntityAsPreset(entity, name)
 		layers = entity:GetGameplayLayers()
 	}
 
-	-- Debug: Print what we saved
 	-- Save to file
 	local encoded = util.TableToJSON(SoftLampPresets)
 	if encoded then
 		file.Write("softlamp_presets.txt", encoded)
 	end
-end
-
--- Function to apply preset settings to entity
-local function ApplyPresetSettings(entity, preset)
-	if not IsValid(entity) or not preset then return end
-
-	-- Apply settings using the NetworkVar setters
-	-- Basic lamp settings
-	if preset.r then 
-		entity:SetLightColor(Vector(preset.r/255, (preset.g or 255)/255, (preset.b or 255)/255))
-	end
-	if preset.brightness then entity:SetBrightness(preset.brightness) end
-	if preset.fov then entity:SetLightFOV(preset.fov) end
-	if preset.distance then entity:SetFarZ(preset.distance) end
-	if preset.nearz then entity:SetNearZ(preset.nearz) end
-	if preset.texture then entity:SetFlashlightTexture(preset.texture) end
-	if preset.toggle ~= nil then entity:SetToggle(preset.toggle == 1) end
-
-	-- Lamp offset
-	if preset.lightoffset_x then
-		entity:SetLightOffset(Vector(preset.lightoffset_x, preset.lightoffset_y, preset.lightoffset_z))
-	end
-
-	-- Focal distance
-	if preset.focaldistance then
-		entity:SetFocalDistance(preset.focaldistance)
-	end
-
-	-- Attenuations
-	if preset.linear then
-		entity:SetLinearAttenuation(preset.linear)
-	end
-	if preset.quadratic then
-		entity:SetQuadraticAttenuation(preset.quadratic)
-	end
-	if preset.constant then
-		entity:SetConstantAttenuation(preset.constant)
-	end
-
-	-- Orthographic settings
-	if preset.orthoon ~= nil then
-		entity:SetEnableOrthographic(preset.orthoon == 1)
-	end
-	if preset.ortho_left then
-		entity:SetOrthoLeft(preset.ortho_left)
-		entity:SetOrthoTop(preset.ortho_top or preset.ortho_left)
-		entity:SetOrthoRight(preset.ortho_right or preset.ortho_left)
-		entity:SetOrthoBottom(preset.ortho_bottom or preset.ortho_left)
-	end
-
-	-- HeavyLight settings
-	if preset.heavy_on ~= nil then
-		entity:SetHeavyOn(preset.heavy_on == 1)
-	end
-	if preset.heavy_shape then
-		entity:SetHeavyShape(preset.heavy_shape)
-	end
-	if preset.shape_radius then
-		entity:SetShapeRadius(preset.shape_radius)
-	end
-	if preset.heavy_layers then
-		entity:SetHeavyLayers(preset.heavy_layers)
-	end
-	if preset.heavy_split then
-		entity:SetHeavySplit(preset.heavy_split)
-	end
-
-	-- Gameplay settings
-	if preset.gameplay_on ~= nil then
-		entity:SetOn(preset.gameplay_on == 1)
-	end
-	if preset.gameplay_shape and preset.gameplay_shape ~= "" then
-		entity:SetGameplayShape(preset.gameplay_shape)
-	end
-	if preset.gameplay_layers then
-		entity:SetGameplayLayers(preset.gameplay_layers)
-	end
-
-	-- Visualization settings
-	if preset.preview_poster ~= nil then
-		entity:SetPreviewPoster(preset.preview_poster == 1)
-	end
-	if preset.preview_points ~= nil then
-		entity:SetPreviewPoints(preset.preview_points == 1)
-	end
-	if preset.preview_safearea ~= nil then
-		entity:SetPreviewSafeArea(preset.preview_safearea == 1)
-	end
-	if preset.preview_ignorez ~= nil then
-		entity:SetPreviewIgnoreZ(preset.preview_ignorez == 1)
-	end
+	hook.Run("SoftLampPresetChanged")
 end
 
 -- Function to load preset to entity (applying ALL settings)
@@ -481,40 +370,10 @@ end
 -- Client receives confirmation
 net.Receive("SoftLampPresetLoaded", function()
 	local entity = net.ReadEntity()
+	if not IsValid(entity) then return end
+	notification.AddLegacy( "Preset applied!", NOTIFY_GENERIC, 3 )
+	surface.PlaySound("buttons/button14.wav")
 end)
-
--- Add context menu using PostDrawOpaqueRenderables hook to catch context menu
-hook.Add("PostDrawOpaqueRenderables", "SoftLampContextMenuSetup", function()
-	-- This runs every frame, but we'll use it to set up our context menu hook
-	if not hook.GetTable()["OnSpawnMenuOpen"] or not hook.GetTable()["OnSpawnMenuOpen"]["SoftLampContextMenuChecker"] then
-		hook.Add("OnSpawnMenuOpen", "SoftLampContextMenuChecker", function()
-			-- This approach might work better
-		end)
-	end
-end)
-
--- Try the correct context menu hook approach
-local function SetupContextMenu()
-	-- Override the default context menu behavior for our entity
-	local oldEntityMenu = properties.GetHovered
-	properties.GetHovered = function(pos, ent)
-		local tr = util.TraceLine({
-			start = pos,
-			endpos = pos + gui.ScreenToVector(ScrW()/2, ScrH()/2) * 32768,
-			filter = LocalPlayer()
-		})
-		
-		if IsValid(tr.Entity) and tr.Entity:GetClass() == "gmod_softlamp" then
-			-- Store the entity for our context menu
-			SoftLampContextEntity = tr.Entity
-		end
-		
-		return oldEntityMenu(pos, ent)
-	end
-end
-
--- Setup when the entity initializes
-timer.Simple(0.1, SetupContextMenu)
 
 -- Add the context menu options via properties system
 if not properties.List["softlamp_save_preset"] then

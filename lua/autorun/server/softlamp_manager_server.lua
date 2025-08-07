@@ -1,8 +1,6 @@
 -- Soft Lamp Manager - Server Side
 -- Handles teleportation networking
 
-if not SERVER then return end
-
 -- Network strings
 util.AddNetworkString("SoftLampManager_Teleport")
 util.AddNetworkString("SoftLampManager_SetColor")
@@ -73,7 +71,14 @@ net.Receive("SoftLampManager_SetFloat", function(len, ply)
 
             OrthoRight = function(lamp, value) lamp:SetOrthoRight(value) end,
 
-            OrthoBottom = function(lamp, value) lamp:SetOrthoBottom(value) end
+            OrthoBottom = function(lamp, value) lamp:SetOrthoBottom(value) end,
+
+            LinearAttenuation = function(lamp, value) lamp:SetLinearAttenuation(value) end,
+
+            QuadraticAttenuation = function(lamp, value) lamp:SetQuadraticAttenuation(value) end,
+
+            ConstantAttenuation = function(lamp, value) lamp:SetConstantAttenuation(value) end
+
         }
 
         options[property](lamp, value)
