@@ -536,7 +536,6 @@ function TOOL.BuildCPanel( CPanel )
 	local function RefreshPresetList()
 		presetList:Clear()
 		for name, data in pairs(SoftLampPresets or {}) do
-			if name == "loaded" then continue end
 			presetList:AddLine(name)
 		end
 	end

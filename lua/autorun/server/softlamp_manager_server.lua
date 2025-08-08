@@ -3,11 +3,20 @@
 
 -- Network strings
 util.AddNetworkString("SoftLampManager_Teleport")
-util.AddNetworkString("SoftLampManager_SetColor")
-util.AddNetworkString("SoftLampManager_SetFloat")
-util.AddNetworkString("SoftLampManager_SetBool")
-util.AddNetworkString("SoftLampManager_SetString")
-util.AddNetworkString("SoftLampManager_SetVector")
+util.AddNetworkString("SoftLampManager_SetProperty")
+util.AddNetworkString("SoftLampManager_ApplyLampPreset")
+
+local TYPE_VECTOR = 0
+local TYPE_FLOAT  = 1
+local TYPE_BOOL   = 2
+local TYPE_STRING = 3
+
+local types = {
+    net.ReadVector,
+    net.ReadFloat,
+    net.ReadBool,
+    net.ReadString
+}
 
 -- Handle teleport requests from clients
 net.Receive("SoftLampManager_Teleport", function(len, ply)
@@ -25,125 +34,29 @@ net.Receive("SoftLampManager_Teleport", function(len, ply)
     ply:SetEyeAngles(angles)
 end)
 
--- Handle color changes
-net.Receive("SoftLampManager_SetColor", function(len, ply)
-    if not IsValid(ply) then return end
-
+net.Receive("SoftLampManager_SetProperty", function(len, ply)
     local lamp = net.ReadEntity()
-    local color = net.ReadVector()
+    local property = net.ReadString()
+    local val = types[net.ReadUInt(2)+1]()
 
-    if IsValid(lamp) and lamp:GetClass() == "gmod_softlamp" then
-        lamp:SetLightColor(color)
+    if not IsValid(ply) then return end
+    if IsValid(lamp) and lamp:GetClass() == "gmod_softlamp" and lamp:GetNetworkVars()[property] ~= nil then
+        lamp["Set" .. property](lamp, val)
     end
 end)
 
--- Handle float value changes (brightness, FOV, etc.)
-net.Receive("SoftLampManager_SetFloat", function(len, ply)
-    if not IsValid(ply) then return end
-
+net.Receive("SoftLampManager_ApplyLampPreset", function(len, ply)
     local lamp = net.ReadEntity()
-    local property = net.ReadString()
-    local value = net.ReadFloat()
-
-    if IsValid(lamp) and lamp:GetClass() == "gmod_softlamp" then
-        local options = {
-            Brightness = function(lamp, value) lamp:SetBrightness(value) end,
-
-            LightFOV = function(lamp, value) lamp:SetLightFOV(value) end,
-
-            NearZ = function(lamp, value) lamp:SetNearZ(value) end,
-
-            FarZ = function(lamp, value) lamp:SetFarZ(value) end,
-
-            FocalDistance = function(lamp, value) lamp:SetFocalDistance(value) end,
-
-            ShapeRadius = function(lamp, value) lamp:SetShapeRadius(value) end,
-
-            HeavyLayers = function(lamp, value) lamp:SetHeavyLayers(value) end,
-
-            HeavySplit = function(lamp, value) lamp:SetHeavySplit(value) end,
-
-            GameplayLayers = function(lamp, value) lamp:SetGameplayLayers(value) end,
-
-            OrthoLeft = function(lamp, value) lamp:SetOrthoLeft(value) end,
-
-            OrthoTop = function(lamp, value) lamp:SetOrthoTop(value) end,
-
-            OrthoRight = function(lamp, value) lamp:SetOrthoRight(value) end,
-
-            OrthoBottom = function(lamp, value) lamp:SetOrthoBottom(value) end,
-
-            LinearAttenuation = function(lamp, value) lamp:SetLinearAttenuation(value) end,
-
-            QuadraticAttenuation = function(lamp, value) lamp:SetQuadraticAttenuation(value) end,
-
-            ConstantAttenuation = function(lamp, value) lamp:SetConstantAttenuation(value) end
-
-        }
-
-        options[property](lamp, value)
+    local count = net.ReadUInt(5)
+    local apply = {}
+    for i = 1, count do
+        apply[i] = { net.ReadString(), types[net.ReadUInt(2)+1]() }
     end
-end)
 
--- Handle boolean value changes (On, Heavy, etc.)
-net.Receive("SoftLampManager_SetBool", function(len, ply)
-    if not IsValid(ply) then return end
-
-    local lamp = net.ReadEntity()
-    local property = net.ReadString()
-    local value = net.ReadBool()
-
-    if IsValid(lamp) and lamp:GetClass() == "gmod_softlamp" then
-        if property == "Toggle" then
-            lamp:SetToggle(value)
-        elseif property == "On" then
-            lamp:SetOn(value)
-        elseif property == "HeavyOn" then
-            lamp:SetHeavyOn(value)
-        elseif property == "PreviewPoints" then
-            lamp:SetPreviewPoints(value)
-        elseif property == "PreviewSafeArea" then
-            lamp:SetPreviewSafeArea(value)
-        elseif property == "PreviewIgnoreZ" then
-            lamp:SetPreviewIgnoreZ(value)
-        elseif property == "EnableOrthographic" then
-            lamp:SetEnableOrthographic(value)
-        elseif property == "PreviewPoster" then
-            lamp:SetPreviewPoster(value)
-        end
-    end
-end)
-
--- Handle string value changes (texture, shapes, etc.)
-net.Receive("SoftLampManager_SetString", function(len, ply)
-    if not IsValid(ply) then return end
-
-    local lamp = net.ReadEntity()
-    local property = net.ReadString()
-    local value = net.ReadString()
-
-    if IsValid(lamp) and lamp:GetClass() == "gmod_softlamp" then
-        if property == "FlashlightTexture" then
-            lamp:SetFlashlightTexture(value)
-        elseif property == "HeavyShape" then
-            lamp:SetHeavyShape(value)
-        elseif property == "GameplayShape" then
-            lamp:SetGameplayShape(value)
-        end
-    end
-end)
-
--- Handle vector value changes (light offset, etc.)
-net.Receive("SoftLampManager_SetVector", function(len, ply)
-    if not IsValid(ply) then return end
-
-    local lamp = net.ReadEntity()
-    local property = net.ReadString()
-    local value = net.ReadVector()
-
-    if IsValid(lamp) and lamp:GetClass() == "gmod_softlamp" then
-        if property == "LightOffset" then
-            lamp:SetLightOffset(value)
-        end
+    if not IsValid(ply) or not IsValid(lamp) or not lamp:GetClass() == "gmod_softlamp" then return end
+    local propertytable = lamp:GetNetworkVars()
+    for k, data in ipairs(apply) do
+        if not (propertytable[data[1]] ~= nil) then continue end
+        lamp["Set" .. data[1]](lamp, data[2])
     end
 end)

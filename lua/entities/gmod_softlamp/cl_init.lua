@@ -408,12 +408,10 @@ if not properties.List["softlamp_load_preset"] then
 		Filter = function(self, ent, ply)
 			if ent:GetClass() ~= "gmod_softlamp" then return false end
 
-			-- Count actual presets (excluding the "loaded" flag)
+			-- Count actual presets
 			local presetCount = 0
 			for name, preset in pairs(SoftLampPresets or {}) do
-				if name ~= "loaded" then
-					presetCount = presetCount + 1
-				end
+				presetCount = presetCount + 1
 			end
 			return presetCount > 0
 		end,
@@ -442,10 +440,8 @@ if not properties.List["softlamp_load_preset"] then
 			-- Add all presets to the list
 			local presetCount = 0
 			for name, preset in pairs(SoftLampPresets or {}) do
-				if name ~= "loaded" then
-					list:AddLine(name)
-					presetCount = presetCount + 1
-				end
+				list:AddLine(name)
+				presetCount = presetCount + 1
 			end
 
 			if presetCount == 0 then
