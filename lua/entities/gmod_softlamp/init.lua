@@ -28,6 +28,8 @@ function ENT:Initialize()
 	self:SetLightOffset( Vector(self:OBBMaxs().x, 0, 0) )
 	self:SetHeavyOn(true)
 	self:SetHeavySplit(1)
+	self:SetShadowsOn(true)
+	self:SetGameplayShadows(true)
 	self:SetLinearAttenuation(100)
 end
 

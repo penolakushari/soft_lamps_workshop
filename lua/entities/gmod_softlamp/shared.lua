@@ -50,26 +50,28 @@ function ENT:SetupDataTables()
 	self:NetworkVar("String", 1, "HeavyShape",  { KeyName = "pshape",  Edit = { order = orderer(), category = "HeavyLight", type = "Combo", title = "Surface Shape", values = combo } })
 	self:NetworkVar("Float",  4, "ShapeRadius", { KeyName = "sradius", Edit = { order = orderer(), category = "HeavyLight", type = "Float", title = "Surface Radius", min = 1, max = 1048576 } })
 	self:NetworkVar("Int",    0, "HeavyLayers", { KeyName = "players", Edit = { order = orderer(), category = "HeavyLight", type = "Int",   title = "Surface Shape Resolution", min = 1, max = 200 } })
-	self:NetworkVar("Int",    1, "HeavySplit", 	{ KeyName = "split",   Edit = { order = orderer(), category = "HeavyLight", type = "Int",   title = "Split Lights", min = 1, max = 10 } })
+	self:NetworkVar("Int",    1, "HeavySplit",  { KeyName = "split",   Edit = { order = orderer(), category = "HeavyLight", type = "Int",   title = "Split Lights", min = 1, max = 10 } })
+	self:NetworkVar("Bool",   3, "ShadowsOn",   { KeyName = "shadowon",Edit = { order = orderer(), category = "HeavyLight", type = "Boolean", title = "Enable Shadows" } })
 
 	local combo2 = table.Copy(combo)
 	combo2["Same as above"] = ""
 	-- Gameplay
-	self:NetworkVar("Bool",   3, "On",             { KeyName = "pon",     Edit = { order = orderer(), category = "Gameplay", type = "Boolean", title = "On" } })
+	self:NetworkVar("Bool",   4, "On",             { KeyName = "pon",     Edit = { order = orderer(), category = "Gameplay", type = "Boolean", title = "On" } })
 	--self:NetworkVar("Float",  5, "Scroll",         { KeyName = "pon",     Edit = { order = orderer(), category = "Gameplay", type = "Float", title = "Scroll Speed (override gameplay shape)", min = 0, max = 60 } })
 	self:NetworkVar("String", 2, "GameplayShape",  { KeyName = "sshape",  Edit = { order = orderer(), category = "Gameplay", type = "Combo",  title = "Surface Shape", values = combo2, text = "Same as above" } })
 	self:NetworkVar("Int",    2, "GameplayLayers", { KeyName = "slayers", Edit = { order = orderer(), category = "Gameplay", type = "Int",   title = "Surface Shape Resolution", min = 1, max = 100 } })
+	self:NetworkVar("Bool",   5, "GameplayShadows",{ KeyName = "sshadowon",Edit = { order = orderer(), category = "Gameplay", type = "Boolean", title = "Enable Shadows" } })
 
 	-- Visualization
-	self:NetworkVar("Bool", 4, "PreviewPoster",   { KeyName = "previewposter",  Edit = { order = orderer(), category = "Visualization", type = "Combo", title = "Pick Target", values = { Gameplay = false, HeavyLight = true }, text = "Gameplay" } })
-	self:NetworkVar("Bool", 5, "PreviewPoints",   { KeyName = "previewpoints",  Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Light Sources" } })
+	self:NetworkVar("Bool", 6, "PreviewPoster",   { KeyName = "previewposter",  Edit = { order = orderer(), category = "Visualization", type = "Combo", title = "Pick Target", values = { Gameplay = false, HeavyLight = true }, text = "Gameplay" } })
+	self:NetworkVar("Bool", 7, "PreviewPoints",   { KeyName = "previewpoints",  Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Light Sources" } })
 	--self:NetworkVar("Bool", 5, "PreviewCone",     { KeyName = "previewcone",    Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Projection Cones" } })
-	self:NetworkVar("Bool", 6, "PreviewSafeArea", { KeyName = "previewsafe",    Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Safe Area" } })
-	self:NetworkVar("Bool", 7, "PreviewIgnoreZ",  { KeyName = "previewignorez", Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Show Through Walls" } })
+	self:NetworkVar("Bool", 8, "PreviewSafeArea", { KeyName = "previewsafe",    Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Safe Area" } })
+	self:NetworkVar("Bool", 9, "PreviewIgnoreZ",  { KeyName = "previewignorez", Edit = { order = orderer(), category = "Visualization", type = "Boolean", title = "Show Through Walls" } })
 
 	-- Delete
-	self:NetworkVar("Bool", 8, "Delete1", { KeyName = "del", Edit = { order = orderer(), category = "Delete (select both to delete)", type = "Boolean", title = "Delete (1)" } })
-	self:NetworkVar("Bool", 9, "Delete2", { KeyName = "ete", Edit = { order = orderer(), category = "Delete (select both to delete)", type = "Boolean", title = "Delete (2)" } })
+	self:NetworkVar("Bool", 10, "Delete1", { KeyName = "del", Edit = { order = orderer(), category = "Delete (select both to delete)", type = "Boolean", title = "Delete (1)" } })
+	self:NetworkVar("Bool", 11, "Delete2", { KeyName = "ete", Edit = { order = orderer(), category = "Delete (select both to delete)", type = "Boolean", title = "Delete (2)" } })
 
 	-- Extra
 	self:NetworkVar("Int",    3, "LinearAttenuation", { KeyName = "linear", 		Edit = { order = orderer(), category = "Extra", type = "Int",   title = "Linear Attenuation", min = 0, max = 100 } })

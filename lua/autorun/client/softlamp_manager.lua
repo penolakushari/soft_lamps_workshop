@@ -1,4 +1,4 @@
--- Soft Lamp Manager - Y Key Menu System
+-- Soft Lamp Manager - Menu System
 -- This provides a menu to view, edit, and teleport to all soft lamps in the scene
 
 -- Add custom context menu option for saving presets
@@ -29,7 +29,7 @@ local SoftLampManager = {
     lampList = {},
     editingLamp = nil,
     editSettings = {}, -- Store edited settings that don't apply to the entity
-    yKeyPressed = false -- Track Y key state for Think hook
+    yKeyPressed = false -- Track key state for Think hook
 }
 
 -- Colors and styling
@@ -45,6 +45,16 @@ local TYPE_VECTOR = 0
 local TYPE_FLOAT  = 1
 local TYPE_BOOL   = 2
 local TYPE_STRING = 3
+
+local MANAGER_KEY
+
+local KeyConVar = CreateClientConVar("softlamp_manager_key", "0")
+cvars.AddChangeCallback("softlamp_manager_key", function(convar, oldval, newval)
+    newval = tonumber(newval)
+    MANAGER_KEY = newval or MANAGER_KEY
+end)
+
+MANAGER_KEY = KeyConVar:GetInt() -- This will return 0 upon failing to convert to number
 
 local SelectLampForEditing
 
@@ -385,7 +395,7 @@ local function UpdateEditPanel()
     yPos = yPos + 130 -- Space for the larger color mixer
 
     -- Brightness
-    local brightnessSlider = CreateSlider(SoftLampManager.editPanel, lamp, 0, 100, 1, "Brightness")
+    local brightnessSlider = CreateSlider(SoftLampManager.editPanel, lamp, 0, 1000, 1, "Brightness")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Brightness:", brightnessSlider, 200)
 
     -- FOV
@@ -393,15 +403,15 @@ local function UpdateEditPanel()
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "FOV:", fovSlider, 200)
 
     -- NearZ
-    local nearZSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 1000, 0, "NearZ")
+    local nearZSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 1048576, 0, "NearZ")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Near Z:", nearZSlider, 200)
 
     -- FarZ
-    local farZSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 10000, 0, "FarZ")
+    local farZSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 1048576, 0, "FarZ")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Far Z:", farZSlider, 200)
 
     -- Focal Distance
-    local focalSlider = CreateSlider(SoftLampManager.editPanel, lamp, 0, 5000, 0, "FocalDistance")
+    local focalSlider = CreateSlider(SoftLampManager.editPanel, lamp, 0, 1048576, 0, "FocalDistance")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Focal Distance:", focalSlider, 200)
 
     -- Toggle checkbox
@@ -421,7 +431,7 @@ local function UpdateEditPanel()
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Heavy On:", heavyOnCheck, 20)
 
     -- Shape Radius
-    local radiusSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 1000, 0, "ShapeRadius")
+    local radiusSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 1048576, 0, "ShapeRadius")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Shape Radius:", radiusSlider, 200)
 
     -- Heavy Layers
@@ -432,6 +442,9 @@ local function UpdateEditPanel()
     local heavySplitSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 10, 0, "HeavySplit")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Heavy Split:", heavySplitSlider, 200)
 
+    local shadowsCheck = CreateCheckBox(SoftLampManager.editPanel, lamp, "ShadowsOn")
+    yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Enable Shadows:", shadowsCheck, 20)
+
     -- Separator
     CreateSeparator(SoftLampManager.editPanel, 10, yPos, "─── GAMEPLAY SETTINGS ───")
     yPos = yPos + 25
@@ -439,6 +452,9 @@ local function UpdateEditPanel()
     -- Gameplay Layers
     local gameplayLayersSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 20, 0, "GameplayLayers")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Gameplay Layers:", gameplayLayersSlider, 200)
+
+    local gameplayShadowsCheck = CreateCheckBox(SoftLampManager.editPanel, lamp, "GameplayShadows")
+    yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Enable Shadows:", gameplayShadowsCheck, 20)
 
     -- Separator
     CreateSeparator(SoftLampManager.editPanel, 10, yPos, "─── PREVIEW SETTINGS ───")
@@ -578,6 +594,10 @@ function SoftLampsManagerApplyPresetToLamp(lamp, preset, presetName)
         table.insert(applytable, { "HeavySplit", TYPE_FLOAT, preset.heavy_split } )
     end
 
+	if preset.heavy_shadows then
+		table.insert(applytable, { "ShadowsOn", TYPE_BOOL, preset.heavy_shadows == 1 })
+	end
+
     -- Apply toggle
     if preset.toggle ~= nil then
         table.insert(applytable, { "Toggle", TYPE_BOOL, preset.toggle == 1 } )
@@ -602,6 +622,10 @@ function SoftLampsManagerApplyPresetToLamp(lamp, preset, presetName)
     if preset.gameplay_shape then
         table.insert(applytable, { "GameplayShape", TYPE_STRING, preset.gameplay_shape } )
     end
+
+	if preset.gameplay_shadows then
+		table.insert(applytable, { "GameplayShadows", TYPE_BOOL, preset.gameplay_shadows == 1 })
+	end
 
     -- Apply preview settings
     if preset.preview_poster ~= nil then
@@ -672,7 +696,7 @@ local function CreateMenu()
     frame:SetPos(50, 50)
     frame:SetTitle("") -- Remove built-in title to avoid duplication
     frame:SetDraggable(true)
-    frame:ShowCloseButton(false) -- Hide default close button since we use Y key
+    frame:ShowCloseButton(false) -- Hide default close button since we use manager key
     frame.Paint = function(self, w, h)
         draw.RoundedBox(8, 0, 0, w, h, COLOR_BG)
         draw.RoundedBox(8, 0, 0, w, 30, COLOR_HEADER)
@@ -682,7 +706,7 @@ local function CreateMenu()
     local headerLabel = vgui.Create("DLabel", frame)
     headerLabel:SetPos(10, 5)
     headerLabel:SetSize(300, 20)
-    headerLabel:SetText("Soft Lamp Manager - Press Y to close")
+    headerLabel:SetText("Soft Lamp Manager - Press " .. (string.upper(language.GetPhrase(input.GetKeyName(MANAGER_KEY))) or "UNBOUND") .. " to close")
     headerLabel:SetTextColor(COLOR_TEXT)
     headerLabel:SetFont("DermaDefaultBold")
 
@@ -743,6 +767,28 @@ local function ToggleMenu()
     end
 end
 
+local function ManagerUtilitiesMenu(cpanel)
+    local parent = vgui.Create("Panel", cpanel)
+    cpanel:AddItem(parent)
+
+    local binder = vgui.Create("DBinder", parent)
+    binder:SetSize(100, 50)
+    binder:SetConVar("softlamp_manager_key")
+
+    binder.label = vgui.Create("DLabel", parent)
+    binder.label:SetText("Toggle Soft Lamp Manager")
+    binder.label:SetDark(true)
+    binder.label:SizeToContents()
+
+    parent.PerformLayout = function(self, w)
+        self:SetHeight(80)
+        local mid = w/2
+
+        binder.label:SetPos(mid - binder.label:GetWide()/2, 5)
+        binder:SetPos(mid - binder:GetWide()/2, 25)
+    end
+end
+
 -- Alternative key binding using Think hook for more reliability
 local nextKeyCheck = 0
 hook.Add("Think", "SoftLampManager_KeyCheck", function()
@@ -752,14 +798,14 @@ hook.Add("Think", "SoftLampManager_KeyCheck", function()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
 
-    if input.IsKeyDown(KEY_Y) and not SoftLampManager.yKeyPressed then
+    if input.IsKeyDown(MANAGER_KEY) and not SoftLampManager.yKeyPressed then
         -- Check if we're typing in a text field
         local focusedPanel = vgui.GetKeyboardFocus()
         if not focusedPanel or not focusedPanel.ClassName or focusedPanel.ClassName ~= "DTextEntry" then
             SoftLampManager.yKeyPressed = true
             ToggleMenu()
         end
-    elseif not input.IsKeyDown(KEY_Y) then
+    elseif not input.IsKeyDown(MANAGER_KEY) then
         SoftLampManager.yKeyPressed = false
     end
 end)
@@ -798,6 +844,10 @@ hook.Add("EntityRemoved", "SoftLampManager_EntityRemoved", function(ent)
     end
 end)
 
+hook.Add("PopulateToolMenu", "SoftLampManager_CreateBinder", function ()
+    spawnmenu.AddToolMenuOption( "Utilities", "Soft Lamps", "softlamps_managermenu", "Soft Lamps Manager", "", "", ManagerUtilitiesMenu )
+end)
+
 -- Console command as backup
 concommand.Add("softlamp_manager", function()
     ToggleMenu()
@@ -809,5 +859,9 @@ concommand.Add("softlamp_manager_test", function()
     print("[SoftLamp Manager] Found " .. #GetAllSoftLamps() .. " soft lamps in scene")
 end)
 
-print("Soft Lamp Manager loaded! Press Y to open the lamp manager.")
+if MANAGER_KEY ~= 0 then
+    print("Soft Lamp Manager loaded! Press " .. (string.upper(language.GetPhrase(input.GetKeyName(MANAGER_KEY))) or "UNBOUND") .. " to open the lamp manager.")
+else
+    print("Soft Lamp Manager loaded! Setup a key to open the lamp manager in the Utilities tab!")
+end
 print("Backup commands: 'softlamp_manager' to open menu, 'softlamp_manager_test' to test") 

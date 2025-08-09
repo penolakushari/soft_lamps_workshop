@@ -73,7 +73,7 @@ function ENT:HeavyLightStart(brightness, lampcount, vlplanecount, vlpasscount)
 
 	for i = 1, lampcount do
 		local pt = ProjectedTexture() 
-		pt:SetEnableShadows(true)
+		pt:SetEnableShadows(self:GetShadowsOn())
 		pt:SetTexture(self:GetFlashlightTexture())
 		pt:SetNearZ(self:GetNearZ())
 		pt:SetFarZ(self:GetFarZ())
@@ -225,6 +225,8 @@ function ENT:Think()
 	local tex = self:GetFlashlightTexture()
 	local b = self:GetBrightness() / table.Count(self.Flashlights)	-- total sum of lights' brightness should equal requested brightness
 	local c = self:GetLightColor():ToColor()	-- convert vector to color structure
+	local linear, quadratic, constant = self:GetLinearAttenuation(), self:GetQuadraticAttenuation(), self:GetConstantAttenuation()
+	local shadows = self:GetGameplayShadows()
 
 	for pt, pos in pairs(self.Flashlights) do
 		pt:SetTexture(tex)
@@ -232,9 +234,10 @@ function ENT:Think()
 		pt:SetFarZ(farz)
 		pt:SetFOV(fov)
 		pt:SetOrthographic(orton, ortleft, orttop, ortright, ortbot)
-		pt:SetLinearAttenuation(self:GetLinearAttenuation())
-		pt:SetQuadraticAttenuation(self:GetQuadraticAttenuation())
-		pt:SetConstantAttenuation(self:GetConstantAttenuation())
+		pt:SetLinearAttenuation(linear)
+		pt:SetQuadraticAttenuation(quadratic)
+		pt:SetConstantAttenuation(constant)
+		pt:SetEnableShadows(shadows)
 		pt:SetColor(c)
 		pt:SetBrightness(b)
 
@@ -328,11 +331,13 @@ local function SaveEntityAsPreset(entity, name)
 		shape_radius = entity:GetShapeRadius(),
 		heavy_layers = entity:GetHeavyLayers(),
 		heavy_split = entity:GetHeavySplit(),
+		heavy_shadows = entity:GetShadowsOn() and 1 or 0,
 
 		-- Gameplay settings (make sure we get the actual on state)
 		gameplay_on = entity:GetOn() and 1 or 0,
 		gameplay_shape = entity:GetGameplayShape(),
 		gameplay_layers = entity:GetGameplayLayers(),
+		gameplay_shadows = entity:GetGameplayShadows() and 1 or 0,
 
 		-- Visualization settings
 		preview_poster = entity:GetPreviewPoster() and 1 or 0,
