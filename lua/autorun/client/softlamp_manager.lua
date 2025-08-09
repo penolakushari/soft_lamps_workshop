@@ -233,6 +233,66 @@ local function UpdateLampList()
     end
 end
 
+local function CreateSeparator(parent, x, y, septext)
+    local separator = vgui.Create("DLabel", parent)
+    separator:SetPos(x, y)
+    separator:SetSize(390, 20) -- Expanded width
+    separator:SetText(septext)
+    separator:SetTextColor(COLOR_TEXT)
+    separator:SetFont("DermaDefaultBold")
+    separator:SetContentAlignment(5) -- Center
+end
+
+local function CreateSlider(parent, lamp, min, max, dec, valname)
+    local slider = vgui.Create("DNumSlider", parent)
+    slider:SetMinMax(min, max)
+    slider:SetDecimals(dec)
+    slider:SetValue(lamp["Get" .. valname](lamp))
+    slider.OnValueChanged = function(self, value)
+        net.Start("SoftLampManager_SetProperty")
+            net.WriteEntity(lamp)
+            net.WriteString(valname)
+            net.WriteUInt(TYPE_FLOAT, 2)
+            net.WriteFloat(value)
+        net.SendToServer()
+    end
+
+    -- Overriding vanilla functions to remove clamping
+    slider.SetValue = function(self, val)
+        val = val or 0
+        if (self:GetValue() == val) then return end
+        self.Scratch:SetValue( val )
+        self:ValueChanged( self:GetValue() )
+    end
+
+    slider.ValueChanged = function(self, val)
+        val = val or 0
+        if (self.TextArea != vgui.GetKeyboardFocus()) then
+            self.TextArea:SetValue( self.Scratch:GetTextValue() )
+        end
+
+        self.Slider:SetSlideX( self.Scratch:GetFraction() )
+        self:OnValueChanged( val )
+        self:SetCookie( "slider_val", val )
+    end
+
+    return slider
+end
+
+local function CreateCheckBox(parent, lamp, valname)
+    local check = vgui.Create("DCheckBox", parent)
+    check:SetChecked(lamp["Get" .. valname](lamp))
+    check.OnChange = function(self, checked)
+        net.Start("SoftLampManager_SetProperty")
+            net.WriteEntity(lamp)
+            net.WriteString(valname)
+            net.WriteUInt(TYPE_BOOL, 2)
+            net.WriteBool(checked)
+        net.SendToServer()
+    end
+    return check
+end
+
 -- Helper function to create a labeled control
 local function CreateLabeledControl(parent, x, y, labelText, control, width)
     local label = vgui.Create("DLabel", parent)
@@ -297,13 +357,7 @@ local function UpdateEditPanel()
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Notes:", notesEntry, 200)
 
     -- Separator
-    local separator1 = vgui.Create("DLabel", SoftLampManager.editPanel)
-    separator1:SetPos(10, yPos)
-    separator1:SetSize(390, 20) -- Expanded width
-    separator1:SetText("─── LAMP SETTINGS ───")
-    separator1:SetTextColor(COLOR_TEXT)
-    separator1:SetFont("DermaDefaultBold")
-    separator1:SetContentAlignment(5) -- Center
+    CreateSeparator(SoftLampManager.editPanel, 10, yPos, "─── LAMP SETTINGS ───")
     yPos = yPos + 25
 
     -- Light Color
@@ -331,301 +385,91 @@ local function UpdateEditPanel()
     yPos = yPos + 130 -- Space for the larger color mixer
 
     -- Brightness
-    local brightnessSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    brightnessSlider:SetMinMax(0, 100)
-    brightnessSlider:SetDecimals(1)
-    brightnessSlider:SetValue(lamp:GetBrightness())
-    brightnessSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("Brightness")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local brightnessSlider = CreateSlider(SoftLampManager.editPanel, lamp, 0, 100, 1, "Brightness")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Brightness:", brightnessSlider, 200)
 
     -- FOV
-    local fovSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    fovSlider:SetMinMax(0, 180)
-    fovSlider:SetDecimals(0)
-    fovSlider:SetValue(lamp:GetLightFOV())
-    fovSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("LightFOV")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local fovSlider = CreateSlider(SoftLampManager.editPanel, lamp, 0, 180, 1, "LightFOV")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "FOV:", fovSlider, 200)
 
     -- NearZ
-    local nearZSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    nearZSlider:SetMinMax(1, 1000)
-    nearZSlider:SetDecimals(0)
-    nearZSlider:SetValue(lamp:GetNearZ())
-    nearZSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("NearZ")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local nearZSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 1000, 0, "NearZ")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Near Z:", nearZSlider, 200)
 
     -- FarZ
-    local farZSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    farZSlider:SetMinMax(1, 10000)
-    farZSlider:SetDecimals(0)
-    farZSlider:SetValue(lamp:GetFarZ())
-    farZSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("FarZ")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local farZSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 10000, 0, "FarZ")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Far Z:", farZSlider, 200)
 
     -- Focal Distance
-    local focalSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    focalSlider:SetMinMax(0, 5000)
-    focalSlider:SetDecimals(0)
-    focalSlider:SetValue(lamp:GetFocalDistance())
-    focalSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("FocalDistance")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local focalSlider = CreateSlider(SoftLampManager.editPanel, lamp, 0, 5000, 0, "FocalDistance")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Focal Distance:", focalSlider, 200)
 
     -- Toggle checkbox
-    local toggleCheck = vgui.Create("DCheckBox", SoftLampManager.editPanel)
-    toggleCheck:SetChecked(lamp:GetToggle())
-    toggleCheck.OnChange = function(self, checked)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("Toggle")
-            net.WriteUInt(TYPE_BOOL, 2)
-            net.WriteBool(checked)
-        net.SendToServer()
-    end
+    local toggleCheck = CreateCheckBox(SoftLampManager.editPanel, lamp, "Toggle")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Toggle:", toggleCheck, 20)
 
     -- On checkbox
-    local onCheck = vgui.Create("DCheckBox", SoftLampManager.editPanel)
-    onCheck:SetChecked(lamp:GetOn())
-    onCheck.OnChange = function(self, checked)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("On")
-            net.WriteUInt(TYPE_BOOL, 2)
-            net.WriteBool(checked)
-        net.SendToServer()
-    end
+    local onCheck = CreateCheckBox(SoftLampManager.editPanel, lamp, "On")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "On:", onCheck, 20)
 
     -- Separator
-    local separator2 = vgui.Create("DLabel", SoftLampManager.editPanel)
-    separator2:SetPos(10, yPos)
-    separator2:SetSize(390, 20) -- Expanded width
-    separator2:SetText("─── HEAVY LIGHT SETTINGS ───")
-    separator2:SetTextColor(COLOR_TEXT)
-    separator2:SetFont("DermaDefaultBold")
-    separator2:SetContentAlignment(5)
+    CreateSeparator(SoftLampManager.editPanel, 10, yPos, "─── HEAVY LIGHT SETTINGS ───")
     yPos = yPos + 25
 
     -- Heavy On
-    local heavyOnCheck = vgui.Create("DCheckBox", SoftLampManager.editPanel)
-    heavyOnCheck:SetChecked(lamp:GetHeavyOn())
-    heavyOnCheck.OnChange = function(self, checked)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("HeavyOn")
-            net.WriteUInt(TYPE_BOOL, 2)
-            net.WriteBool(checked)
-        net.SendToServer()
-    end
+    local heavyOnCheck = CreateCheckBox(SoftLampManager.editPanel, lamp, "HeavyOn")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Heavy On:", heavyOnCheck, 20)
 
     -- Shape Radius
-    local radiusSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    radiusSlider:SetMinMax(1, 1000)
-    radiusSlider:SetDecimals(0)
-    radiusSlider:SetValue(lamp:GetShapeRadius())
-    radiusSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("ShapeRadius")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local radiusSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 1000, 0, "ShapeRadius")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Shape Radius:", radiusSlider, 200)
 
     -- Heavy Layers
-    local heavyLayersSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    heavyLayersSlider:SetMinMax(1, 50)
-    heavyLayersSlider:SetDecimals(0)
-    heavyLayersSlider:SetValue(lamp:GetHeavyLayers())
-    heavyLayersSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("HeavyLayers")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local heavyLayersSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 50, 0, "HeavyLayers")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Heavy Layers:", heavyLayersSlider, 200)
 
     -- Heavy Split
-    local heavySplitSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    heavySplitSlider:SetMinMax(1, 10)
-    heavySplitSlider:SetDecimals(0)
-    heavySplitSlider:SetValue(lamp:GetHeavySplit())
-    heavySplitSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("HeavySplit")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local heavySplitSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 10, 0, "HeavySplit")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Heavy Split:", heavySplitSlider, 200)
 
     -- Separator
-    local separator3 = vgui.Create("DLabel", SoftLampManager.editPanel)
-    separator3:SetPos(10, yPos)
-    separator3:SetSize(390, 20) -- Expanded width
-    separator3:SetText("─── GAMEPLAY SETTINGS ───")
-    separator3:SetTextColor(COLOR_TEXT)
-    separator3:SetFont("DermaDefaultBold")
-    separator3:SetContentAlignment(5)
+    CreateSeparator(SoftLampManager.editPanel, 10, yPos, "─── GAMEPLAY SETTINGS ───")
     yPos = yPos + 25
 
     -- Gameplay Layers
-    local gameplayLayersSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    gameplayLayersSlider:SetMinMax(1, 20)
-    gameplayLayersSlider:SetDecimals(0)
-    gameplayLayersSlider:SetValue(lamp:GetGameplayLayers())
-    gameplayLayersSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("GameplayLayers")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local gameplayLayersSlider = CreateSlider(SoftLampManager.editPanel, lamp, 1, 20, 0, "GameplayLayers")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Gameplay Layers:", gameplayLayersSlider, 200)
 
     -- Separator
-    local separator4 = vgui.Create("DLabel", SoftLampManager.editPanel)
-    separator4:SetPos(10, yPos)
-    separator4:SetSize(390, 20) -- Expanded width
-    separator4:SetText("─── PREVIEW SETTINGS ───")
-    separator4:SetTextColor(COLOR_TEXT)
-    separator4:SetFont("DermaDefaultBold")
-    separator4:SetContentAlignment(5)
+    CreateSeparator(SoftLampManager.editPanel, 10, yPos, "─── PREVIEW SETTINGS ───")
     yPos = yPos + 25
 
     -- Preview Points
-    local previewPointsCheck = vgui.Create("DCheckBox", SoftLampManager.editPanel)
-    previewPointsCheck:SetChecked(lamp:GetPreviewPoints())
-    previewPointsCheck.OnChange = function(self, checked)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("PreviewPoints")
-            net.WriteUInt(TYPE_BOOL, 2)
-            net.WriteBool(checked)
-        net.SendToServer()
-    end
+    local previewPointsCheck = CreateCheckBox(SoftLampManager.editPanel, lamp, "PreviewPoints")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Preview Points:", previewPointsCheck, 20)
 
     -- Preview Safe Area
-    local previewSafeCheck = vgui.Create("DCheckBox", SoftLampManager.editPanel)
-    previewSafeCheck:SetChecked(lamp:GetPreviewSafeArea())
-    previewSafeCheck.OnChange = function(self, checked)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("PreviewSafeArea")
-            net.WriteUInt(TYPE_BOOL, 2)
-            net.WriteBool(checked)
-        net.SendToServer()
-    end
+    local previewSafeCheck = CreateCheckBox(SoftLampManager.editPanel, lamp, "PreviewSafeArea")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Preview Safe Area:", previewSafeCheck, 20)
 
     -- Preview Ignore Z
-    local previewIgnoreZCheck = vgui.Create("DCheckBox", SoftLampManager.editPanel)
-    previewIgnoreZCheck:SetChecked(lamp:GetPreviewIgnoreZ())
-    previewIgnoreZCheck.OnChange = function(self, checked)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("PreviewIgnoreZ")
-            net.WriteUInt(TYPE_BOOL, 2)
-            net.WriteBool(checked)
-        net.SendToServer()
-    end
+    local previewIgnoreZCheck = CreateCheckBox(SoftLampManager.editPanel, lamp, "PreviewIgnoreZ")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Preview Ignore Z:", previewIgnoreZCheck, 20)
 
      -- Separator
-    local separator5 = vgui.Create("DLabel", SoftLampManager.editPanel)
-    separator5:SetPos(10, yPos)
-    separator5:SetSize(390, 20) -- Expanded width
-    separator5:SetText("───     EXTRA     ───")
-    separator5:SetTextColor(COLOR_TEXT)
-    separator5:SetFont("DermaDefaultBold")
-    separator5:SetContentAlignment(5)
+    CreateSeparator(SoftLampManager.editPanel, 10, yPos, "───     EXTRA     ───")
     yPos = yPos + 25
 
     -- Linear
-    local linearAttenSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    linearAttenSlider:SetMinMax(0, 100)
-    linearAttenSlider:SetDecimals(0)
-    linearAttenSlider:SetValue(lamp:GetLinearAttenuation())
-    linearAttenSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("LinearAttenuation")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local linearAttenSlider = CreateSlider(SoftLampManager.editPanel, lamp, 0, 100, 0, "LinearAttenuation")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Linear Attenuation:", linearAttenSlider, 200)
 
     -- Quadratic
-    local quadraticAttenSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    quadraticAttenSlider:SetMinMax(0, 100)
-    quadraticAttenSlider:SetDecimals(0)
-    quadraticAttenSlider:SetValue(lamp:GetQuadraticAttenuation())
-    quadraticAttenSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("QuadraticAttenuation")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local quadraticAttenSlider = CreateSlider(SoftLampManager.editPanel, lamp, 0, 100, 0, "QuadraticAttenuation")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Quadratic Attenuation:", quadraticAttenSlider, 200)
 
     -- Constant
-    local constantAttenSlider = vgui.Create("DNumSlider", SoftLampManager.editPanel)
-    constantAttenSlider:SetMinMax(0, 100)
-    constantAttenSlider:SetDecimals(0)
-    constantAttenSlider:SetValue(lamp:GetConstantAttenuation())
-    constantAttenSlider.OnValueChanged = function(self, value)
-        net.Start("SoftLampManager_SetProperty")
-            net.WriteEntity(lamp)
-            net.WriteString("ConstantAttenuation")
-            net.WriteUInt(TYPE_FLOAT, 2)
-            net.WriteFloat(value)
-        net.SendToServer()
-    end
+    local constantAttenSlider = CreateSlider(SoftLampManager.editPanel, lamp, 0, 100, 0, "ConstantAttenuation")
     yPos = CreateLabeledControl(SoftLampManager.editPanel, 10, yPos, "Constant Attenuation:", constantAttenSlider, 200)
 end
 
