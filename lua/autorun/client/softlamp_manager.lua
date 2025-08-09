@@ -58,16 +58,9 @@ MANAGER_KEY = KeyConVar:GetInt() -- This will return 0 upon failing to convert t
 
 local SelectLampForEditing
 
--- Get all soft lamps in the scene
-local function GetAllSoftLamps()
-    local lamps = {}
-    for _, ent in pairs(ents.FindByClass("gmod_softlamp")) do
-        if IsValid(ent) then
-            table.insert(lamps, ent)
-        end
-    end
-    return lamps
-end
+-- Get all soft lamps in the scene - relying on the function defined in the shared realm
+GetAllSoftLamps = GetAllSoftLamps
+
 
 -- Get a friendly name for a lamp
 local function GetLampName(lamp)
@@ -184,6 +177,13 @@ local function UpdateLampList()
             lampPanel.DoClick = function(self)
                 SelectLampForEditing(lamp)
             end
+			lampPanel.OnCursorEntered = function() -- Hovered state for Soft Lamp Controller's bbox rendering
+				lamp.hovered = true
+			end
+			lampPanel.OnCursorExited = function()
+				lamp.hovered = nil
+			end
+
 
             -- Lamp name
             local nameLabel = vgui.Create("DLabel", lampPanel)
@@ -594,9 +594,9 @@ function SoftLampsManagerApplyPresetToLamp(lamp, preset, presetName)
         table.insert(applytable, { "HeavySplit", TYPE_FLOAT, preset.heavy_split } )
     end
 
-	if preset.heavy_shadows then
-		table.insert(applytable, { "ShadowsOn", TYPE_BOOL, preset.heavy_shadows == 1 })
-	end
+    if preset.heavy_shadows then
+        table.insert(applytable, { "ShadowsOn", TYPE_BOOL, preset.heavy_shadows == 1 })
+    end
 
     -- Apply toggle
     if preset.toggle ~= nil then
@@ -623,9 +623,9 @@ function SoftLampsManagerApplyPresetToLamp(lamp, preset, presetName)
         table.insert(applytable, { "GameplayShape", TYPE_STRING, preset.gameplay_shape } )
     end
 
-	if preset.gameplay_shadows then
-		table.insert(applytable, { "GameplayShadows", TYPE_BOOL, preset.gameplay_shadows == 1 })
-	end
+    if preset.gameplay_shadows then
+        table.insert(applytable, { "GameplayShadows", TYPE_BOOL, preset.gameplay_shadows == 1 })
+    end
 
     -- Apply preview settings
     if preset.preview_poster ~= nil then
@@ -791,6 +791,7 @@ end
 
 -- Alternative key binding using Think hook for more reliability
 local nextKeyCheck = 0
+hook.Remove("Think", "SoftLampManager_KeyCheck")
 hook.Add("Think", "SoftLampManager_KeyCheck", function()
     if CurTime() < nextKeyCheck then return end
     nextKeyCheck = CurTime() + 0.05 -- Check every 0.05 seconds
@@ -811,6 +812,7 @@ hook.Add("Think", "SoftLampManager_KeyCheck", function()
 end)
 
 -- Clean up on disconnect
+hook.Remove("ShutDown", "SoftLampManager_Cleanup")
 hook.Add("ShutDown", "SoftLampManager_Cleanup", function()
     if IsValid(SoftLampManager.menuFrame) then
         SoftLampManager.menuFrame:Remove()
@@ -818,6 +820,7 @@ hook.Add("ShutDown", "SoftLampManager_Cleanup", function()
 end)
 
 -- Handle entity removal
+hook.Remove("EntityRemoved", "SoftLampManager_EntityRemoved")
 hook.Add("EntityRemoved", "SoftLampManager_EntityRemoved", function(ent)
     if ent:GetClass() == "gmod_softlamp" then
         -- Remove from our tracking
@@ -844,6 +847,7 @@ hook.Add("EntityRemoved", "SoftLampManager_EntityRemoved", function(ent)
     end
 end)
 
+hook.Remove("PopulateToolMenu", "SoftLampManager_CreateBinder")
 hook.Add("PopulateToolMenu", "SoftLampManager_CreateBinder", function ()
     spawnmenu.AddToolMenuOption( "Utilities", "Soft Lamps", "softlamps_managermenu", "Soft Lamps Manager", "", "", ManagerUtilitiesMenu )
 end)
