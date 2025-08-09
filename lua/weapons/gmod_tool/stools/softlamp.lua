@@ -524,7 +524,7 @@ function TOOL.BuildCPanel( CPanel )
 	CPanel:NumSlider("#tool.softlamp.ortho_size", "softlamp_orthosize", 0, 2048)
 
 	-- Preset Management Section
-	CPanel:Help("Presets: Use C key and right-click entity → 'Save as Preset' to save. Right-click entity → 'Load Preset' to apply complete settings to existing lamps. Double-click preset to load in tool.")
+	CPanel:Help("Presets: Use C key and right-click entity → 'Save as Preset' to save. Right-click entity → 'Load Preset' to apply complete settings to existing lamps. Click a preset here to load it in tool.")
 
 	-- Preset List
 	local presetList = vgui.Create("DListView")
@@ -540,7 +540,7 @@ function TOOL.BuildCPanel( CPanel )
 		end
 	end
 
-	-- Load preset on double-click
+	-- Load preset
 	presetList.OnRowSelected = function(panel, rowIndex, row)
 		local name = row:GetColumnText(1)
 		if name then

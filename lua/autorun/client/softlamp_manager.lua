@@ -46,6 +46,8 @@ local TYPE_FLOAT  = 1
 local TYPE_BOOL   = 2
 local TYPE_STRING = 3
 
+local SelectLampForEditing
+
 -- Get all soft lamps in the scene
 local function GetAllSoftLamps()
     local lamps = {}
@@ -107,6 +109,128 @@ local function CreateEditPanel()
     label:SetSize(300, 20)
     label:SetText("Select a lamp to edit its settings")
     label:SetTextColor(COLOR_TEXT_DIM)
+end
+
+-- Show preset menu for loading presets
+local function ShowPresetMenu(lamp, button)
+    if not IsValid(lamp) then return end
+
+    -- Access the global presets from the tool
+    local presets = SoftLampPresets or {}
+
+    -- Count actual presets
+    local presetCount = 0
+    for name, preset in pairs(presets) do
+        if type(preset) == "table" then
+            presetCount = presetCount + 1
+        end
+    end
+
+    if presetCount == 0 then
+        local notice = vgui.Create("DNotify")
+        notice:SetPos(button:LocalToScreen(0, 0))
+        notice:AddItem("No presets available", NOTIFY_ERROR, 3)
+        return
+    end
+
+    local menu = DermaMenu()
+    menu:SetPos(button:LocalToScreen(0, 30))
+
+    -- Add preset options (filter out non-table values)
+    for name, preset in pairs(presets) do
+        if type(preset) == "table" then
+            menu:AddOption(name, function()
+                SoftLampsManagerApplyPresetToLamp(lamp, preset, name)
+            end)
+        end
+    end
+
+    menu:Open()
+end
+
+-- Update the lamp list
+local function UpdateLampList()
+    if not IsValid(SoftLampManager.lampListPanel) then return end
+
+    SoftLampManager.lampListPanel:Clear()
+
+    local yPos = 5
+    for i, lamp in ipairs(SoftLampManager.lampList) do
+        if IsValid(lamp) then
+            local lampPanel = vgui.Create("DButton", SoftLampManager.lampListPanel)
+            lampPanel:SetPos(5, yPos)
+            lampPanel:SetSize(400, 60) -- Expanded width from 350 to 400
+            lampPanel:SetText("") -- No button text
+            lampPanel.lampEntity = lamp
+            lampPanel.Paint = function(self, w, h)
+                local col = COLOR_HOVER
+                if SoftLampManager.editingLamp == lamp then
+                    col = COLOR_SELECTED
+                elseif self:IsHovered() then
+                    col = COLOR_HOVERED
+                end
+                draw.RoundedBox(4, 0, 0, w, h, col)
+            end
+            lampPanel.DoClick = function(self)
+                SelectLampForEditing(lamp)
+            end
+
+            -- Lamp name
+            local nameLabel = vgui.Create("DLabel", lampPanel)
+            nameLabel:SetPos(10, 5)
+            nameLabel:SetSize(250, 20)
+            nameLabel:SetText(GetLampName(lamp))
+            nameLabel:SetTextColor(COLOR_TEXT)
+
+            -- Status info
+            local statusLabel = vgui.Create("DLabel", lampPanel)
+            statusLabel:SetPos(10, 25)
+            statusLabel:SetSize(250, 15)
+            local onText = lamp:GetOn() and "ON" or "OFF"
+            local brightness = math.floor(lamp:GetBrightness() * 10) / 10
+
+            local statusText = string.format("Status: %s | Brightness: %g | FOV: %g°", onText, brightness, lamp:GetLightFOV())
+            statusLabel:SetText(statusText)
+            statusLabel:SetTextColor(COLOR_TEXT_DIM)
+            statusLabel:SetFont("DermaDefaultBold")
+
+            -- Notes on separate line below status
+            if SoftLampManager.editSettings[lamp] and SoftLampManager.editSettings[lamp].notes and SoftLampManager.editSettings[lamp].notes ~= "" then
+                local notesLabel = vgui.Create("DLabel", lampPanel)
+                notesLabel:SetPos(10, 40)
+                notesLabel:SetSize(250, 15)
+                local notesText = "Notes: " .. SoftLampManager.editSettings[lamp].notes
+                notesLabel:SetText(notesText)
+                notesLabel:SetTextColor(Color(150, 200, 150, 255)) -- Slightly green tint for notes
+                notesLabel:SetFont("DermaDefault")
+            end
+
+            -- Load Preset button (moved further right)
+            local loadBtn = vgui.Create("DButton", lampPanel)
+            loadBtn:SetPos(260, 15) -- Moved from 210 to 260
+            loadBtn:SetSize(50, 30)
+            loadBtn:SetText("Load")
+            loadBtn:SetFont("DermaDefaultBold")
+            loadBtn.DoClick = function(self)
+                ShowPresetMenu(lamp, self)
+                return true -- Prevent the panel click from firing
+            end
+            loadBtn:SetTooltip("Load Preset")
+
+            -- Teleport button (moved further right)
+            local teleBtn = vgui.Create("DButton", lampPanel)
+            teleBtn:SetPos(320, 15) -- Moved from 265 to 320
+            teleBtn:SetSize(70, 30)
+            teleBtn:SetText("Teleport")
+            teleBtn:SetFont("DermaDefaultBold")
+            teleBtn.DoClick = function(self)
+                TeleportToLamp(lamp)
+                return true -- Prevent the panel click from firing
+            end
+
+            yPos = yPos + 65
+        end
+    end
 end
 
 -- Helper function to create a labeled control
@@ -506,7 +630,7 @@ local function UpdateEditPanel()
 end
 
 -- Select a lamp for editing
-local function SelectLampForEditing(lamp)
+function SelectLampForEditing(lamp)
     if not IsValid(lamp) then return end
 
     SoftLampManager.editingLamp = lamp
@@ -524,43 +648,6 @@ local function SelectLampForEditing(lamp)
     end
 
     UpdateEditPanel()
-end
-
--- Show preset menu for loading presets
-local function ShowPresetMenu(lamp, button)
-    if not IsValid(lamp) then return end
-
-    -- Access the global presets from the tool
-    local presets = SoftLampPresets or {}
-
-    -- Count actual presets
-    local presetCount = 0
-    for name, preset in pairs(presets) do
-        if type(preset) == "table" then
-            presetCount = presetCount + 1
-        end
-    end
-
-    if presetCount == 0 then
-        local notice = vgui.Create("DNotify")
-        notice:SetPos(button:LocalToScreen(0, 0))
-        notice:AddItem("No presets available", NOTIFY_ERROR, 3)
-        return
-    end
-
-    local menu = DermaMenu()
-    menu:SetPos(button:LocalToScreen(0, 30))
-
-    -- Add preset options (filter out non-table values)
-    for name, preset in pairs(presets) do
-        if type(preset) == "table" then
-            menu:AddOption(name, function()
-                SoftLampsManagerApplyPresetToLamp(lamp, preset, name)
-            end)
-        end
-    end
-
-    menu:Open()
 end
 
 local types = {
@@ -715,97 +802,13 @@ function SoftLampsManagerApplyPresetToLamp(lamp, preset, presetName)
     net.SendToServer()
 
     chat.AddText(Color(100, 255, 100), "Applied preset '" .. (presetName or "Unknown") .. "' to soft lamp!")
+    surface.PlaySound("buttons/button14.wav")
 
     -- Refresh the edit panel if this lamp is being edited
     if SoftLampManager.editingLamp == lamp then
         timer.Simple(0.1, function()
             UpdateEditPanel()
         end)
-    end
-end
-
--- Update the lamp list
-local function UpdateLampList()
-    if not IsValid(SoftLampManager.lampListPanel) then return end
-
-    SoftLampManager.lampListPanel:Clear()
-
-    local yPos = 5
-    for i, lamp in ipairs(SoftLampManager.lampList) do
-        if IsValid(lamp) then
-            local lampPanel = vgui.Create("DButton", SoftLampManager.lampListPanel)
-            lampPanel:SetPos(5, yPos)
-            lampPanel:SetSize(400, 60) -- Expanded width from 350 to 400
-            lampPanel:SetText("") -- No button text
-            lampPanel.lampEntity = lamp
-            lampPanel.Paint = function(self, w, h)
-                local col = COLOR_HOVER
-                if SoftLampManager.editingLamp == lamp then
-                    col = COLOR_SELECTED
-                elseif self:IsHovered() then
-                    col = COLOR_HOVERED
-                end
-                draw.RoundedBox(4, 0, 0, w, h, col)
-            end
-            lampPanel.DoClick = function(self)
-                SelectLampForEditing(lamp)
-            end
-
-            -- Lamp name
-            local nameLabel = vgui.Create("DLabel", lampPanel)
-            nameLabel:SetPos(10, 5)
-            nameLabel:SetSize(250, 20)
-            nameLabel:SetText(GetLampName(lamp))
-            nameLabel:SetTextColor(COLOR_TEXT)
-
-            -- Status info
-            local statusLabel = vgui.Create("DLabel", lampPanel)
-            statusLabel:SetPos(10, 25)
-            statusLabel:SetSize(250, 15)
-            local onText = lamp:GetOn() and "ON" or "OFF"
-            local brightness = math.floor(lamp:GetBrightness() * 10) / 10
-
-            local statusText = string.format("Status: %s | Brightness: %g | FOV: %g°", onText, brightness, lamp:GetLightFOV())
-            statusLabel:SetText(statusText)
-            statusLabel:SetTextColor(COLOR_TEXT_DIM)
-            statusLabel:SetFont("DermaDefaultBold")
-
-            -- Notes on separate line below status
-            if SoftLampManager.editSettings[lamp] and SoftLampManager.editSettings[lamp].notes and SoftLampManager.editSettings[lamp].notes ~= "" then
-                local notesLabel = vgui.Create("DLabel", lampPanel)
-                notesLabel:SetPos(10, 40)
-                notesLabel:SetSize(250, 15)
-                local notesText = "Notes: " .. SoftLampManager.editSettings[lamp].notes
-                notesLabel:SetText(notesText)
-                notesLabel:SetTextColor(Color(150, 200, 150, 255)) -- Slightly green tint for notes
-                notesLabel:SetFont("DermaDefault")
-            end
-
-            -- Load Preset button (moved further right)
-            local loadBtn = vgui.Create("DButton", lampPanel)
-            loadBtn:SetPos(260, 15) -- Moved from 210 to 260
-            loadBtn:SetSize(50, 30)
-            loadBtn:SetText("Load")
-            loadBtn:SetFont("DermaDefaultBold")
-            loadBtn.DoClick = function(self)
-                ShowPresetMenu(lamp, self)
-                return true -- Prevent the panel click from firing
-            end
-            loadBtn:SetTooltip("Load Preset")
-
-            -- Teleport button (moved further right)
-            local teleBtn = vgui.Create("DButton", lampPanel)
-            teleBtn:SetPos(320, 15) -- Moved from 265 to 320
-            teleBtn:SetSize(70, 30)
-            teleBtn:SetText("Teleport")
-            teleBtn:SetFont("DermaDefaultBold")
-            teleBtn.DoClick = function(self)
-                TeleportToLamp(lamp)
-                return true -- Prevent the panel click from firing
-            end
-
-            yPos = yPos + 65
-        end
     end
 end
 
@@ -900,7 +903,7 @@ end
 local nextKeyCheck = 0
 hook.Add("Think", "SoftLampManager_KeyCheck", function()
     if CurTime() < nextKeyCheck then return end
-    nextKeyCheck = CurTime() + 0.1 -- Check every 0.1 seconds
+    nextKeyCheck = CurTime() + 0.05 -- Check every 0.05 seconds
 
     local ply = LocalPlayer()
     if not IsValid(ply) then return end

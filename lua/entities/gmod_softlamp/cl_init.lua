@@ -355,26 +355,6 @@ local function SaveEntityAsPreset(entity, name)
 	hook.Run("SoftLampPresetChanged")
 end
 
--- Function to load preset to entity (applying ALL settings)
-local function LoadPresetToEntity(entity, preset)
-	if not IsValid(entity) or not preset then return end
-
-	-- Always send to server, even in singleplayer
-	-- This ensures the edit properties dialog sees the correct values
-	net.Start("SoftLampLoadPreset")
-		net.WriteEntity(entity)
-		net.WriteTable(preset)
-	net.SendToServer()
-end
-
--- Client receives confirmation
-net.Receive("SoftLampPresetLoaded", function()
-	local entity = net.ReadEntity()
-	if not IsValid(entity) then return end
-	notification.AddLegacy( "Preset applied!", NOTIFY_GENERIC, 3 )
-	surface.PlaySound("buttons/button14.wav")
-end)
-
 -- Add the context menu options via properties system
 if not properties.List["softlamp_save_preset"] then
 	properties.Add("softlamp_save_preset", {
@@ -458,38 +438,14 @@ if not properties.List["softlamp_load_preset"] then
 					input.SetCursorPos(ScrW()/2, ScrH()/2)
 					gui.EnableScreenClicker(false)
 
-					LoadPresetToEntity(ent, SoftLampPresets[presetName])
+					SoftLampsManagerApplyPresetToLamp(ent, SoftLampPresets[presetName], presetName)
 					frame:Close()
 				end
 			end
 
-			-- Add load button
-			local loadButton = vgui.Create("DButton", frame)
-			loadButton:SetText("Load Selected Preset")
-			loadButton:Dock(BOTTOM)
-			loadButton:SetTall(30)
-			loadButton:SetMouseInputEnabled(true)
-			loadButton.DoClick = function()
-				-- Prevent click from passing through to the game world
-				input.SetCursorPos(ScrW()/2, ScrH()/2)
-				gui.EnableScreenClicker(false)
-
-				local selected = list:GetSelectedLine()
-				if selected then
-					local line = list:GetLine(selected)
-					local presetName = line:GetColumnText(1)
-					if presetName and SoftLampPresets[presetName] then
-						LoadPresetToEntity(ent, SoftLampPresets[presetName])
-						frame:Close()
-					end
-				else
-					chat.AddText(Color(255, 100, 100), "[Soft Lamps] ", Color(255, 255, 255), "Please select a preset first!")
-				end
-			end
-			
 			-- Add help text
 			local helpLabel = vgui.Create("DLabel", frame)
-			helpLabel:SetText("Double-click or select and click 'Load' to apply preset")
+			helpLabel:SetText("Select a preset to apply")
 			helpLabel:Dock(BOTTOM)
 			helpLabel:SetTall(20)
 			helpLabel:SetContentAlignment(5) -- Center
