@@ -339,7 +339,7 @@ else
 
 			for _, softlamp in ipairs(GetAllSoftLamps()) do
 				if invert then
-					softlamp:SetOn(softlamp:GetOn())
+					softlamp:SetOn(not softlamp:GetOn())
 				else
 					softlamp:SetOn(gameplay)
 				end
