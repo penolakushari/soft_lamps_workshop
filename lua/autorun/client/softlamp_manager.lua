@@ -4,6 +4,7 @@
 -- Add custom context menu option for saving presets
 -- Initialize preset system
 SoftLampPresets = SoftLampPresets or {}
+SoftLampHoveredVar = SoftLampHoveredVar or nil -- Global var shared with sh_softlamp_controller
 local SOFTLAMPS_MNGR_PRESETSLOADED = false
 
 -- Load presets from file if not already loaded
@@ -177,12 +178,12 @@ local function UpdateLampList()
             lampPanel.DoClick = function(self)
                 SelectLampForEditing(lamp)
             end
-			lampPanel.OnCursorEntered = function() -- Hovered state for Soft Lamp Controller's bbox rendering
-				lamp.hovered = true
-			end
-			lampPanel.OnCursorExited = function()
-				lamp.hovered = nil
-			end
+            lampPanel.OnCursorEntered = function() -- Hovered state for Soft Lamp Controller's bbox rendering
+                SoftLampHoveredVar = lamp
+            end
+            lampPanel.OnCursorExited = function()
+                SoftLampHoveredVar = nil
+            end
 
 
             -- Lamp name
@@ -227,14 +228,67 @@ local function UpdateLampList()
             end
             loadBtn:SetTooltip("Load Preset")
 
-            -- Teleport button (moved further right)
-            local teleBtn = vgui.Create("DButton", lampPanel)
-            teleBtn:SetPos(320, 15) -- Moved from 265 to 320
-            teleBtn:SetSize(70, 30)
-            teleBtn:SetText("Teleport")
-            teleBtn:SetFont("DermaDefaultBold")
-            teleBtn.DoClick = function(self)
-                TeleportToLamp(lamp)
+            -- Quick Menu button (moved further right)
+            local menuBtn = vgui.Create("DButton", lampPanel)
+            menuBtn:SetPos(320, 15) -- Moved from 265 to 320
+            menuBtn:SetSize(70, 30)
+            menuBtn:SetText("Quick Menu")
+            menuBtn:SetFont("DermaDefaultBold")
+            menuBtn.DoClick = function(self)
+                local function setLamp(property, state)
+                    net.Start("SoftLampManager_SetProperty")
+                        net.WriteEntity(lamp)
+                        net.WriteString(property)
+                        net.WriteUInt(TYPE_BOOL, 2)
+                        net.WriteBool(state)
+                    net.SendToServer()
+                end
+
+                local dmenu = DermaMenu()
+                local dlampenable = dmenu:AddSubMenu("Soft Lamp On/Off")
+                dlampenable:AddOption("Turn On", function()
+                    setLamp("On", true)
+                    setLamp("HeavyOn", true)
+                end)
+                dlampenable:AddOption("Only Heavylight", function()
+                    setLamp("On", false)
+                    setLamp("HeavyOn", true)
+                end)
+                dlampenable:AddOption("Only Gameplay", function()
+                    setLamp("On", true)
+                    setLamp("HeavyOn", false)
+                end)
+                dlampenable:AddOption("Turn Off", function()
+                    setLamp("On", false)
+                    setLamp("HeavyOn", false)
+                end)
+
+                dmenu:AddOption("Open Entity properties", function()
+                    -- yep, copied this from penol's softlamp concommand
+                    local DPanel = vgui.Create("DFrame")
+                    DPanel:SetSize(300, 400)
+                    DPanel:Center()
+                    DPanel:MakePopup()
+                    local DEnt = vgui.Create("DEntityProperties", DPanel)
+                    DEnt:Dock(FILL)
+                    DEnt:SetEntity(lamp)
+                    function DEnt:OnEntityLost()
+                        DPanel:Remove()
+                    end
+                end)
+                dmenu:AddOption("Teleport", function()
+                    TeleportToLamp(lamp)
+                end)
+                dmenu:AddOption("Delete", function()
+                    net.Start("softlamp_removed")
+                        net.WriteEntity(lamp)
+                    net.SendToServer()
+                    -- Give some time for the client to realize that the soft lamp is gone
+                    timer.Simple(0.5, function()
+                        return UpdateLampList()
+                    end)
+                end)
+                dmenu:Open()
                 return true -- Prevent the panel click from firing
             end
 
@@ -764,6 +818,7 @@ local function ToggleMenu()
     elseif IsValid(SoftLampManager.menuFrame) then
         SoftLampManager.menuFrame:Remove()
         SoftLampManager.menuFrame = nil
+        SoftLampHoveredVar = nil
     end
 end
 
@@ -787,6 +842,14 @@ local function ManagerUtilitiesMenu(cpanel)
         binder.label:SetPos(mid - binder.label:GetWide()/2, 5)
         binder:SetPos(mid - binder:GetWide()/2, 25)
     end
+
+    local bboxCheck = vgui.Create("DCheckBoxLabel", cpanel)
+    bboxCheck:SetConVar("softlamps_bbox")
+    bboxCheck:SetText("Enable Bounding Box drawing for Soft Lamps")
+    bboxCheck:SetDark(true)
+    bboxCheck:SizeToContents()
+    cpanel:AddItem(bboxCheck)
+
 end
 
 -- Alternative key binding using Think hook for more reliability

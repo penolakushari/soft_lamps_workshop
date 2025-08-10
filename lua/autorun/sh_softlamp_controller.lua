@@ -72,6 +72,8 @@ local function setSoftLampState(softlamp, state)
 end
 
 if CLIENT then
+	SoftLampHoveredVar = SoftLampHoveredVar or nil -- This is also defined in Soft Lamp Manager client - to get when we hover over lamp panel
+
 	concommand.Add("softlamps_count", function(ply, cmd, args, argStr)
 		MsgC(color_white, #GetAllSoftLamps(), "\n")
 	end)
@@ -253,7 +255,7 @@ if CLIENT then
 
 	local bboxConVar = CreateClientConVar(
 		"softlamps_bbox",
-		"1",
+		"0",
 		true,
 		false,
 		[[
@@ -283,134 +285,16 @@ if CLIENT then
 		for _, softlamp in ipairs(GetAllSoftLamps()) do
 			local state = getSoftLampState(softlamp)
 			local pos, ang, min, max = softlamp:GetPos(), softlamp:GetAngles(), softlamp:OBBMins(), softlamp:OBBMaxs()
-			if not state == "disabled" then
-				continue
-			end
+
 			render.DrawWireframeBox(pos, ang, min, max, stateColors[state], true)
-			if softlamp.hovered then
+			if softlamp == SoftLampHoveredVar then
 				cam.IgnoreZ(true)
+				render.SetColorMaterial()
 				render.DrawBox(pos, ang, min, max, stateColors[state])
 				cam.IgnoreZ(false)
 			end
 		end
 		cam.End3D()
-	end)
-
-	local BUTTON_TOOLTIP = "Current state: %s\nLeft click to toggle. Right-click to open menu."
-
-	---@param list DScrollPanel
-	local function refreshSoftLampList(list)
-		list:Clear()
-
-		for _, softlamp in ipairs(GetAllSoftLamps()) do
-			local button = vgui.Create("DButton", list)
-			list:AddItem(button)
-			button:Dock(TOP)
-			button.state = getSoftLampState(softlamp)
-			button:SetColor(stateColors[button.state])
-			button:SetTooltip(Format(BUTTON_TOOLTIP, button.state))
-			button:SetDark(true)
-			button:SetText(Format("[%d] gmod_softlamp", softlamp:EntIndex()))
-
-			softlamp:CallOnRemove("softlamp_removed", function(ent)
-				button:Remove()
-				return refreshSoftLampList(list)
-			end)
-
-			local oldThink = button.Think
-			function button:Think()
-				oldThink(self)
-				softlamp.hovered = button:IsHovered()
-				if not IsValid(softlamp) then
-					button:Remove()
-					return
-				end
-
-				local currentState = getSoftLampState(softlamp)
-				if currentState ~= button.state then
-					button.state = currentState
-					button:SetColor(stateColors[button.state])
-				end
-			end
-
-			function button:DoClick()
-				local newStateIndex = wrapNumber(stateMap[self.state] + 1, 0, #states)
-				self.state = states[newStateIndex]
-				self:SetColor(stateColors[self.state])
-				self:SetTooltip(Format(BUTTON_TOOLTIP, self.state))
-
-				setSoftLampState(softlamp, self.state)
-			end
-
-			function button:DoRightClick()
-				local menu = DermaMenu()
-				menu:AddOption("Open properties", function()
-					-- yep, copied this from penol's softlamp concommand
-					local DPanel = vgui.Create("DFrame")
-					DPanel:SetSize(300, 400)
-					DPanel:Center()
-					DPanel:MakePopup()
-					local DEnt = vgui.Create("DEntityProperties", DPanel)
-					DEnt:Dock(FILL)
-					DEnt:SetEntity(softlamp)
-					function DEnt:OnEntityLost()
-						DPanel:Remove()
-					end
-				end)
-				menu:AddOption("Teleport", function()
-					LocalPlayer():SetPos(softlamp:GetPos())
-				end)
-				menu:AddOption("Delete", function()
-					net.Start("softlamp_removed")
-						net.WriteEntity(softlamp)
-					net.SendToServer()
-					-- Give some time for the client to realize that the soft lamp is gone
-					timer.Simple(0.5, function()
-						return refreshSoftLampList(list)
-					end)
-				end)
-				menu:Open()
-			end
-		end
-	end
-
-	local panel
-	---@param cpanel DForm | ControlPanel
-	local function buildUI(cpanel)
-		cpanel:Help(
-			"Manage the state of all soft lamps here. Hover over the table contents below for more info on their states and how to edit them"
-		)
-
-		cpanel.listContainer = vgui.Create("DPanel", cpanel)
-		cpanel.listContainer:Dock(TOP)
-		cpanel.listContainer:DockMargin(30, 30, 30, 30)
-		cpanel.listContainer:SizeTo(-1, 400, 0)
-		cpanel.listContainer.list = vgui.Create("DScrollPanel", cpanel.listContainer)
-		cpanel.listContainer.list:Dock(FILL)
-		refreshSoftLampList(cpanel.listContainer.list)
-		panel = cpanel
-	end
-
-	hook.Remove("OnEntityCreated", "vlazed_softlamp_created")
-	hook.Add("OnEntityCreated", "vlazed_softlamp_created", function(ent)
-		timer.Simple(0, function()
-			if IsValid(ent) and ent:GetClass() == SOFTLAMP_ENTITY and IsValid(panel) then
-				refreshSoftLampList(panel.listContainer.list)
-			end
-		end)
-	end)
-
-	hook.Remove("PopulateToolMenu", "vlazed_softlamp_controller")
-	hook.Add("PopulateToolMenu", "vlazed_softlamp_controller", function()
-		spawnmenu.AddToolMenuOption(
-			"Utilities",
-			"Soft Lamps",
-			"vlazed_softlamp_controller",
-			"Soft Lamp Controller",
-			"",
-			"",
-			buildUI
-		)
 	end)
 else
 	util.AddNetworkString("softlamp_removed")
