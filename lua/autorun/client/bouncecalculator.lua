@@ -123,9 +123,9 @@ concommand.Add("lightbounce_clearcalculations", function(Ply, Cmd, Args)
 end)
 
 concommand.Add("lightbounce_delete_points", function(Ply, Cmd, Args)
-	if tonumber(Args[1]) and tonumber(Args[2]) then
-		local DelRad = tonumber(Args[1])
-		local DelTol = tonumber(Args[2])
+	local DelRad = tonumber(Args[1])
+	local DelTol = tonumber(Args[2])
+	if DelRad and DelTol then
 		local PlyPos = Ply:GetPos()
 		local count = 0
 		for k, lamp in pairs(SoftLampsBounceTable) do
@@ -300,22 +300,34 @@ concommand.Add("lightspray_calculate_advanced", function(Ply, Cmd, Args)
 	end
 
 	local drawrings = GetConVar("cl_draweffectrings")
-	local prevvalue = drawrings:GetInt()
+	drawrings = drawrings:GetInt()
+	local lampbbox = GetConVar("softlamps_bbox")
+	lampbbox = lampbbox:GetInt()
 
-	if prevvalue == 0 then
-		DoBounce()
-	else
+	if drawrings == 0 then
 		RunConsoleCommand("cl_draweffectrings", 0)
-		print("cl_draweffectrings is "..prevvalue.." ! Setting it to 0!")
+		print("cl_draweffectrings is "..drawrings.." ! Setting it to 0!")
+	end
+	if lampbbox == 0 then
+		RunConsoleCommand("softlamps_bbox", 0)
+		print("softlamps_bbox is "..lampbbox.." ! Setting it to 0!")
+	end
 
-		DoBounce()
+	DoBounce()
 
+	if drawrings == 0 then
 		timer.Simple(0, function()
 			print("Restoring cl_draweffectrings...")
-			RunConsoleCommand("cl_draweffectrings", prevvalue)
+			RunConsoleCommand("cl_draweffectrings", drawrings)
 		end)
-
 	end
+	if lampbbox == 0 then
+		timer.Simple(0, function()
+			print("Restoring softlamps_bbox...")
+			RunConsoleCommand("softlamps_bbox", lampbbox)
+		end)
+	end
+
 end)
 
 concommand.Add("reflection_fidelity_helper",function(Ply, Cmd, Args)

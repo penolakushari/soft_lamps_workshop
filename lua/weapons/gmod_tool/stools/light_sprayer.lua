@@ -169,6 +169,25 @@ end
 hook.Add("PreDrawViewModel", "DisplayDistancePlaneLS", DisplayDistancePlaneLS)
 
 
+--Create ClientConVars
+TOOL.ClientConVar[ "scan_fov" ] = 90
+TOOL.ClientConVar[ "scan_nearz" ] = 1
+TOOL.ClientConVar[ "scan_farz" ] = 1000
+TOOL.ClientConVar[ "scan_accuracy_tolerance" ] = 1
+TOOL.ClientConVar[ "scan_radius" ] = 100
+TOOL.ClientConVar[ "scan_interval" ] = 10
+TOOL.ClientConVar[ "scan_jitter" ] = 0
+TOOL.ClientConVar[ "scan_position_offset" ] = 0
+
+TOOL.ClientConVar[ "del_radius" ] = 100
+TOOL.ClientConVar[ "del_tolerance" ] = 100
+
+TOOL.ClientConVar[ "gridsize" ] = 4
+TOOL.ClientConVar[ "gridcol_r" ] = 0
+TOOL.ClientConVar[ "gridcol_g" ] = 255
+TOOL.ClientConVar[ "gridcol_b" ] = 0
+TOOL.ClientConVar[ "gridcol_a" ] = 255
+
 if CLIENT then
 	local function ResetAllConVars(ply, command, arguments)
 		ply:ConCommand("light_sprayer_scan_fov "..tostring(ply:GetFOV()))
@@ -202,26 +221,35 @@ if CLIENT then
 		ply:ConCommand("light_sprayer_scan_position_offset 0")
 	end
 	concommand.Add("light_sprayer_resetscanconvars", ResetScanConVars)
+
+	local DrawDeletePreview = false
+	local delradius
+	hook.Add( "InitPostEntity", "SoftLampDeletePreviewInit", function()
+		delradius = GetConVar("light_sprayer_del_radius")
+
+		cvars.AddChangeCallback("light_sprayer_del_radius", function()
+			DrawDeletePreview = true
+			if not timer.Exists("SoftLampsDeletePrevDisable") then
+				timer.Create("SoftLampsDeletePrevDisable", 2, 1, function() DrawDeletePreview = false end)
+			else
+				timer.Start("SoftLampsDeletePrevDisable")
+			end
+		end)
+	end)
+
+	hook.Add( "PostDrawTranslucentRenderables", "SoftLampDeletePreview", function()
+		local ply = LocalPlayer()
+		if not ply or not DrawDeletePreview then return end
+
+		local delrad = delradius:GetFloat() or 100
+
+			render.SetColorMaterial()
+			render.DrawWireframeSphere(ply:GetPos(), delrad, 12, 18, color_white, true)
+
+
+	end)
+
 end
-
---Create ClientConVars
-TOOL.ClientConVar[ "scan_fov" ] = 90
-TOOL.ClientConVar[ "scan_nearz" ] = 1
-TOOL.ClientConVar[ "scan_farz" ] = 1000
-TOOL.ClientConVar[ "scan_accuracy_tolerance" ] = 1
-TOOL.ClientConVar[ "scan_radius" ] = 100
-TOOL.ClientConVar[ "scan_interval" ] = 10
-TOOL.ClientConVar[ "scan_jitter" ] = 0
-TOOL.ClientConVar[ "scan_position_offset" ] = 0
-
-TOOL.ClientConVar[ "del_radius" ] = 100
-TOOL.ClientConVar[ "del_tolerance" ] = 100
-
-TOOL.ClientConVar[ "gridsize" ] = 4
-TOOL.ClientConVar[ "gridcol_r" ] = 0
-TOOL.ClientConVar[ "gridcol_g" ] = 255
-TOOL.ClientConVar[ "gridcol_b" ] = 0
-TOOL.ClientConVar[ "gridcol_a" ] = 255
 
 --Button, TextBox, Header, Slider
 function TOOL.BuildCPanel(CPanel)
