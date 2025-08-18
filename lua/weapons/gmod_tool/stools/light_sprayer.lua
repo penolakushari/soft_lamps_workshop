@@ -189,6 +189,9 @@ TOOL.ClientConVar[ "gridcol_b" ] = 0
 TOOL.ClientConVar[ "gridcol_a" ] = 255
 
 if CLIENT then
+
+local SupressDrawDeleteRad = false
+
 	local function ResetAllConVars(ply, command, arguments)
 		ply:ConCommand("light_sprayer_scan_fov "..tostring(ply:GetFOV()))
 		ply:ConCommand("light_sprayer_scan_nearz 1")
@@ -228,6 +231,7 @@ if CLIENT then
 		delradius = GetConVar("light_sprayer_del_radius")
 
 		cvars.AddChangeCallback("light_sprayer_del_radius", function()
+			if SupressDrawDeleteRad then return end
 			DrawDeletePreview = true
 			if not timer.Exists("SoftLampsDeletePrevDisable") then
 				timer.Create("SoftLampsDeletePrevDisable", 2, 1, function() DrawDeletePreview = false end)
@@ -249,10 +253,10 @@ if CLIENT then
 
 	end)
 
-end
 
 --Button, TextBox, Header, Slider
 function TOOL.BuildCPanel(CPanel)
+	SupressDrawDeleteRad = true
 
 	LocalPlayer().ShouldDisplayLSGrid = true
 
@@ -280,4 +284,8 @@ function TOOL.BuildCPanel(CPanel)
 	CPanel:AddControl( "Header", { Description	= "Extra Settings"} )
 	CPanel:AddControl( "Slider", { Label = "Delete Radius", Command = "light_sprayer_del_radius", Type = "Float", Min = 0, Max = 5000, Help = false } )
 	CPanel:AddControl( "Slider", { Label = "Delete Tolerance", Command = "light_sprayer_del_tolerance", Type = "Float", Min = 0, Max = 100, Help = false } )
+
+	timer.Simple(0, function() SupressDrawDeleteRad = false end)
+end
+
 end
