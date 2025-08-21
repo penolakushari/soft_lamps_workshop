@@ -656,7 +656,7 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 				local diff = newadd - lightadd
 				lightadd = newadd
 				progressbar[2].progress = i + lightadd
-				DoRender(progressbar, diff)
+				DoRenderV2(progressbar, diff)
 			end
 			i = i + lightadd
 		end
