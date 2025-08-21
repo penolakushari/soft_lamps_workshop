@@ -73,7 +73,8 @@ concommand.Add("poster_additive", function(ply, cmd, args)
 end)
 
 
-local function DoRender(progressbardata)
+local function DoRender(progressbardata, add)
+	if not add then add = 1 end
 	-- Render the scene normally to the whole texture (with inevitable 100% alpha)
 	-- BUG!! Rendering into a non-default RT disables anti-aliasing!!
 	-- WORKAROUND: Render to default RT, copy over to tex_render
@@ -95,11 +96,11 @@ local function DoRender(progressbardata)
 		render.PopRenderTarget()
 	end
 
-	renders = renders + 1
+	renders = renders + add
 
 	-- Blend multiple renders together:
 	render.PushRenderTarget(tex_blend)
-		if renders == 1 then render.Clear(0, 0, 0, 255) end	-- clear on first render
+		if renders == add then render.Clear(0, 0, 0, 255) end	-- clear on first render
 
 		-- Additively paste the current frame onto the blend
 		mat_add:SetTexture("$basetexture", tex_render)
@@ -155,7 +156,8 @@ local function DoRender(progressbardata)
 	render.Spin()
 end
 
-local function DoRenderV2(progressbardata)
+local function DoRenderV2(progressbardata, add)
+	if not add then add = 1 end
 	-- Render the scene normally to the whole texture (with inevitable 100% alpha)
 	-- BUG!! Rendering into a non-default RT disables anti-aliasing!!
 	-- WORKAROUND: Render to default RT, copy over to tex_render
@@ -179,11 +181,11 @@ local function DoRenderV2(progressbardata)
 		render.PopRenderTarget()
 	end
 
-	renders = renders + 1
+	renders = renders + add
 
 	-- Blend multiple renders together:
 	render.PushRenderTarget(tex_blend)
-		if renders == 1 then render.Clear(0, 0, 0, 255) end	-- clear on first render
+		if renders == add then render.Clear(0, 0, 0, 255) end	-- clear on first render
 
 		-- Additively paste the current frame onto the blend
 		mat_add:SetTexture("$basetexture", tex_scrfx)
@@ -558,12 +560,17 @@ local function SoftPoster(postermul, split)
 
 		for lamp, brightness in pairs(lights) do
 			lamp:HeavyLightStart(brightness, lampc)
+			local lightc = lamp:HeavyLightCount()
+			local lightadd = 0
 
 			while lamp:HeavyLightTick() do
-				i = i + lampc
-				progressbar[2].progress = i
-				DoRender(progressbar)
+				local newadd = math.min(lightadd + lampc, lightc)
+				local diff = newadd - lightadd
+				lightadd = newadd
+				progressbar[2].progress = i + lightadd
+				DoRender(progressbar, diff)
 			end
+			i = i + lightadd
 		end
 		FinishRender()
 
@@ -641,12 +648,17 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 
 		for lamp, brightness in pairs(lights) do
 			lamp:HeavyLightStart(brightness, lampc)
+			local lightc = lamp:HeavyLightCount()
+			local lightadd = 0
 
 			while lamp:HeavyLightTick() do
-				i = i + lampc
-				progressbar[2].progress = i
-				DoRenderV2(progressbar)
+				local newadd = math.min(lightadd + lampc, lightc)
+				local diff = newadd - lightadd
+				lightadd = newadd
+				progressbar[2].progress = i + lightadd
+				DoRender(progressbar, diff)
 			end
+			i = i + lightadd
 		end
 		FinishRenderV2()
 
