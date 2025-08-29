@@ -47,7 +47,7 @@ local TYPE_FLOAT  = 1
 local TYPE_BOOL   = 2
 local TYPE_STRING = 3
 
-local MANAGER_KEY
+local MANAGER_KEY = 0
 
 local KeyConVar = CreateClientConVar("softlamp_manager_key", "0")
 cvars.AddChangeCallback("softlamp_manager_key", function(convar, oldval, newval)
@@ -763,7 +763,7 @@ local function CreateMenu()
     local headerLabel = vgui.Create("DLabel", frame)
     headerLabel:SetPos(10, 5)
     headerLabel:SetSize(300, 20)
-    headerLabel:SetText("Soft Lamp Manager - Press " .. (string.upper(language.GetPhrase(input.GetKeyName(MANAGER_KEY))) or "UNBOUND") .. " to close")
+    headerLabel:SetText("Soft Lamp Manager - Press " .. (MANAGER_KEY ~= 0 and string.upper(language.GetPhrase(input.GetKeyName(MANAGER_KEY))) or "UNBOUND") .. " to close")
     headerLabel:SetTextColor(COLOR_TEXT)
     headerLabel:SetFont("DermaDefaultBold")
 
@@ -929,7 +929,7 @@ concommand.Add("softlamp_manager_test", function()
     print("[SoftLamp Manager] Found " .. #GetAllSoftLamps() .. " soft lamps in scene")
 end)
 
-if MANAGER_KEY ~= 0 then
+if MANAGER_KEY and MANAGER_KEY ~= 0 then
     print("Soft Lamp Manager loaded! Press " .. (string.upper(language.GetPhrase(input.GetKeyName(MANAGER_KEY))) or "UNBOUND") .. " to open the lamp manager.")
 else
     print("Soft Lamp Manager loaded! Setup a key to open the lamp manager in the Utilities tab!")
