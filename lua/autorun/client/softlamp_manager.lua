@@ -865,7 +865,7 @@ hook.Add("Think", "SoftLampManager_KeyCheck", function()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
 
-    if input.IsKeyDown(MANAGER_KEY) and not SoftLampManager.yKeyPressed then
+    if MANAGER_KEY ~= 0 and input.IsKeyDown(MANAGER_KEY) and not SoftLampManager.yKeyPressed then
         -- Check if we're typing in a text field
         local focusedPanel = vgui.GetKeyboardFocus()
         if not focusedPanel or not focusedPanel.ClassName or focusedPanel.ClassName ~= "DTextEntry" then
