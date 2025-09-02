@@ -51,11 +51,15 @@ local MANAGER_KEY = 0
 
 local KeyConVar = CreateClientConVar("softlamp_manager_key", "0")
 cvars.AddChangeCallback("softlamp_manager_key", function(convar, oldval, newval)
+	print("newval:", newval)
     newval = tonumber(newval)
+	print("converted: ", newval)
     MANAGER_KEY = newval or MANAGER_KEY
+	print("MANAGER KEY CHANGE ", MANAGER_KEY)
 end)
 
 MANAGER_KEY = KeyConVar:GetInt() -- This will return 0 upon failing to convert to number
+print("SOFT LAMPS MANAGER KEY INIT: ", MANAGER_KEY)
 
 local SelectLampForEditing
 
@@ -859,16 +863,19 @@ end
 local nextKeyCheck = 0
 hook.Remove("Think", "SoftLampManager_KeyCheck")
 hook.Add("Think", "SoftLampManager_KeyCheck", function()
+	if (not MANAGER_KEY) or (MANAGER_KEY == 0) then return end
     if CurTime() < nextKeyCheck then return end
     nextKeyCheck = CurTime() + 0.05 -- Check every 0.05 seconds
 
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
 
-    if MANAGER_KEY ~= 0 and input.IsKeyDown(MANAGER_KEY) and not SoftLampManager.yKeyPressed then
+    if input.IsKeyDown(MANAGER_KEY) and not SoftLampManager.yKeyPressed then
+	print(MANAGER_KEY, "is pressed!")
         -- Check if we're typing in a text field
         local focusedPanel = vgui.GetKeyboardFocus()
         if not focusedPanel or not focusedPanel.ClassName or focusedPanel.ClassName ~= "DTextEntry" then
+		print("opening manager through lua bind")
             SoftLampManager.yKeyPressed = true
             ToggleMenu()
         end
@@ -927,6 +934,10 @@ end)
 concommand.Add("softlamp_manager_test", function()
     print("[SoftLamp Manager] Script is loaded and working!")
     print("[SoftLamp Manager] Found " .. #GetAllSoftLamps() .. " soft lamps in scene")
+end)
+
+concommand.Add("slamp_debug_mngrkey", function()
+    print(MANAGER_KEY)
 end)
 
 if MANAGER_KEY and MANAGER_KEY ~= 0 then
