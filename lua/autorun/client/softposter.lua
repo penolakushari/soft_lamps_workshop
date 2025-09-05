@@ -50,6 +50,11 @@ local tex_blendint =  GetRenderTargetEx("VolumetricLightingBlend",  ScrW(), ScrH
 --mat_copy:SetString("$linearwrite", "1")
 
 
+local Abort_LightCountVar = CreateClientConVar("posterabort_lightcount", "0")
+local Abort_TimeVar = CreateClientConVar("posterabort_time", "0")
+local Abort_PredictTimeVar = CreateClientConVar("posterabort_time_predict", "0")
+
+
 local renders = 0
 local antialias = false
 concommand.Add("poster_aa", function(ply, cmd, args)
@@ -503,11 +508,45 @@ concommand.Add("poster_redo", function(ply, cmd, args)
 	ReFinishRender(postermul)
 end)
 
+local function AbortLightCount(alllights, postermul)
+	local lightlimit = Abort_LightCountVar:GetInt()
+	if lightlimit < 1 then return false end
+	if alllights > lightlimit then
+		surface.PlaySound("buttons/button10.wav")
+		notification.AddLegacy("Poster Light amount exceeds limit! Check console for details", NOTIFY_ERROR, 7)
+		print("Soft Lamp Render Aborted! Amount of lights exceeds one set by posterabort_lightcount (" .. lightlimit .. ").\nLower lamp's Surface Shape Resolution and Split parameters," .. ((postermul > 1) and " use lower poster resolution," or "") .. " or disable this limit by setting posterabort_lightcount to zero!\n")
+		return true
+	end
+	return false
+end
+
+local function AbortTime(limit, starttime)
+	if (SysTime() - starttime) > limit then
+		surface.PlaySound("buttons/button10.wav")
+		notification.AddLegacy("Soft Lamp Render took too long! Check console for details", NOTIFY_ERROR, 7)
+		print("Soft Lamp Render Aborted! Render time exceeded limit! (" .. limit .. ").\nYou can disable this limit by setting posterabort_time to zero!\n")
+		return true
+	end
+	return false
+end
+
+local function AbortTimePredict(limit, starttime, alllights, curlight)
+	local passedtime = SysTime() - starttime
+	local estimate = alllights/(curlight/passedtime)
+	if estimate > limit then
+		surface.PlaySound("buttons/button10.wav")
+		notification.AddLegacy("Soft Lamp Render may take too long! Check console for details", NOTIFY_ERROR, 7)
+		print("Soft Lamp Render Aborted! Predicted Render time exceeded limit! (estimated " .. estimate .. ", limit " .. limit .. ").\nYou can disable this limit by setting posterabort_time or posterabort_time_predict to zero!\n")
+		return true
+	end
+	return false
+end
 
 local function SoftPoster(postermul, split)
 --	local extra = extraframes:GetInt()
 	local callsleft = postermul * postermul --+ extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
 	local starttime = SysTime()	-- benchmarking + feedback
+	local timelimit, predicttime = Abort_TimeVar:GetFloat(), Abort_PredictTimeVar:GetBool()
 
 	local lights = {}
 	local softlamps = ents.FindByClass("gmod_softlamp")
@@ -519,6 +558,9 @@ local function SoftPoster(postermul, split)
 		lightcount = lightcount + c
 		lights[lamp] = c
 	end
+
+	local alllights = lightcount * callsleft
+	if AbortLightCount(alllights, callsleft) then return end
 
 	for lamp, c in pairs(lights) do
 		-- The thing about brightness:
@@ -545,6 +587,7 @@ local function SoftPoster(postermul, split)
 		}
 	}
 
+	local abort = false
 
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
@@ -559,16 +602,25 @@ local function SoftPoster(postermul, split)
 		end
 
 		for lamp, brightness in pairs(lights) do
+			if abort then break end
+
 			lamp:HeavyLightStart(brightness, lampc)
 			local lightc = lamp:HeavyLightCount()
 			local lightadd = 0
 
 			while lamp:HeavyLightTick() do
+				if (timelimit > 0) and not abort then
+					abort = AbortTime(timelimit, starttime)
+				end
+				if abort then break end
 				local newadd = math.min(lightadd + lampc, lightc)
 				local diff = newadd - lightadd
 				lightadd = newadd
 				progressbar[2].progress = i + lightadd
 				DoRender(progressbar, diff)
+				if predicttime and (((i + lightadd) % 10) == 0) and (timelimit > 0) and not abort then
+					abort = AbortTimePredict(timelimit, starttime, alllights, i + lightadd + lightcount*(progressbar[1].progress-1))
+				end
 			end
 			i = i + lightadd
 		end
@@ -596,6 +648,7 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 --	local extra = extraframes:GetInt()
 	local callsleft = postermul * postermul --+ extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
 	local starttime = SysTime()	-- benchmarking + feedback
+	local timelimit, predicttime = Abort_TimeVar:GetFloat(), Abort_PredictTimeVar:GetBool()
 
 	local lights = {}
 	local softlamps = ents.FindByClass("gmod_softlamp")
@@ -607,6 +660,9 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 		lightcount = lightcount + c
 		lights[lamp] = c
 	end
+
+	local alllights = lightcount * callsleft
+	if AbortLightCount(alllights, callsleft) then return end
 
 	for lamp, c in pairs(lights) do
 		-- The thing about brightness:
@@ -633,6 +689,7 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 		}
 	}
 
+	local abort = false
 
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
@@ -647,16 +704,25 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 		end
 
 		for lamp, brightness in pairs(lights) do
+			if abort then break end
+
 			lamp:HeavyLightStart(brightness, lampc)
 			local lightc = lamp:HeavyLightCount()
 			local lightadd = 0
 
 			while lamp:HeavyLightTick() do
+				if (timelimit > 0) and not abort then
+					abort = AbortTime(timelimit, starttime)
+				end
+				if abort then break end
 				local newadd = math.min(lightadd + lampc, lightc)
 				local diff = newadd - lightadd
 				lightadd = newadd
 				progressbar[2].progress = i + lightadd
 				DoRenderV2(progressbar, diff)
+				if predicttime and (((i + lightadd) % 10) == 0) and (timelimit > 0) and not abort then
+					abort = AbortTimePredict(timelimit, starttime, alllights, i + lightadd + lightcount*(progressbar[1].progress-1))
+				end
 			end
 			i = i + lightadd
 		end
