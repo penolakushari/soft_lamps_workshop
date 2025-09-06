@@ -16,6 +16,7 @@ function ENT:Initialize()
 	maxs.y = math.max(maxs.y, radius)
 	maxs.z = math.max(maxs.z, radius)
 	self:SetRenderBounds(mins, maxs)
+	hook.Run("SoftLamp_EntityAdded")
 end
 
 --[[---------------------------------------------------------
@@ -284,6 +285,12 @@ end
 
 function ENT:OnRemove()
 	self:ClearFlashlights()
+
+	timer.Simple(0, function()
+		if not IsValid(self) then
+			hook.Run("SoftLamp_EntityRemoved")
+		end
+	end)
 end
 
 SoftLampPresets = SoftLampPresets or {}

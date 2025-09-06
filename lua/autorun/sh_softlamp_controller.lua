@@ -74,8 +74,15 @@ end
 if CLIENT then
 	SoftLampHoveredVar = SoftLampHoveredVar or nil -- This is also defined in Soft Lamp Manager client - to get when we hover over lamp panel
 
-	concommand.Add("softlamps_count", function(ply, cmd, args, argStr)
-		MsgC(color_white, #GetAllSoftLamps(), "\n")
+	CreateClientConVar("softlamps_count", "0")
+	hook.Add("SoftLamp_EntityAdded", "SoftLampUpdateCount", function()
+		local softlamps = #GetAllSoftLamps()
+		RunConsoleCommand("softlamps_count", tostring(softlamps))
+	end)
+
+	hook.Add("SoftLamp_EntityRemoved", "SoftLampUpdateCount", function()
+		local softlamps = #GetAllSoftLamps()
+		RunConsoleCommand("softlamps_count", tostring(softlamps))
 	end)
 
 	concommand.Add("lightspray_count", function()
@@ -316,13 +323,35 @@ else
 	end)
 
 	local index = 1
-	concommand.Add("softlamps_cycle", function()
+	concommand.Add("softlamps_cycle", function(_, _, args)
 		local softlamps = GetAllSoftLamps()
+		local softcount = #softlamps
+
+		local steps = args[1] and tonumber(args[1]) or 1
+		if (index + steps) > softcount then steps = softcount - index + 1 end
+
+		local indextab = {}
+		for i = index, index + steps-1 do indextab[i] = true end
+
+		for i, softlamp in ipairs(softlamps) do
+			softlamp:SetHeavyOn(indextab[i])
+		end
+
+		print("Enabling lamps from " .. index .. " to " .. index + steps-1)
+		index = wrapNumber(index + steps, 0, softcount)
+	end, nil, "Walk through all softlamps and change their HeavyLight state one at a time.")
+
+	concommand.Add("softlamps_enable", function(_, _, args)
+		if (not args[1]) or not tonumber(args[1]) then print("Input number index for a Soft Lamp to enable") return end
+		local softlamps = GetAllSoftLamps()
+		local softcount = #softlamps
+
+		local index = tonumber(args[1])
+
 		for i, softlamp in ipairs(softlamps) do
 			softlamp:SetHeavyOn(i == index)
 		end
-		index = wrapNumber(index + 1, 0, #softlamps)
-	end, nil, "Walk through all softlamps and change their HeavyLight state one at a time.")
+	end, nil, "Enable HeavyLight of a specific Soft Lamp.")
 
 	concommand.Add("softlamps_detorch", function()
 		for _, softlamp in ipairs(GetAllSoftLamps()) do
