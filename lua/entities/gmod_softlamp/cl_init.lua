@@ -105,7 +105,7 @@ function ENT:HeavyLightStart(brightness, lampcount, vlplanecount, vlpasscount)
 	end
 end
 
-function ENT:HeavyLightTick(viewpos)
+function ENT:HeavyLightTick(viewang)
 	local nextpos = true
 
 	if self.HeavyLightVLPlaneIndex then
@@ -162,9 +162,10 @@ function ENT:HeavyLightTick(viewpos)
 		local max = self.HeavyLightVLPlaneMax
 
 		local lamppos, lampang = self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles()
-		local lviewpos = WorldToLocal(viewpos, angle_zero, lamppos, lampang)
+		local viewpos = viewang:Forward()
+		local lviewpos = WorldToLocal(viewpos, angle_zero, vector_origin, lampang)
 		lviewpos.x = 0
-		local roll = lviewpos:Angle().pitch
+		local roll = math.Round(lviewpos:Angle().pitch)
 		local passmod = ((self.HeavyLightVLPlanePass-1) / self.HeavyLightVLPPlanePassMax)*180
 		roll = roll + passmod
 

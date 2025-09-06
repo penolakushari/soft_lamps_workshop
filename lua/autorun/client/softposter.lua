@@ -831,7 +831,7 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 			lamp:HeavyLightStart(brightness, nil, godrays, passes)
 			j = j + 1
 
-			local cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewOrigin)
+			local cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles)
 			local lastpass
 			while cont do
 				progressbar[2].progress = j + vlpass-1
@@ -844,7 +844,7 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 				SingleRender(vlp, progressbar, vlpindex == 1, camstarts[i])
 				-- DoRender(progressbar)
 
-				cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewOrigin)
+				cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles)
 				lastpass = vlpass or lastpass
 			end
 			j = j + lastpass-1
