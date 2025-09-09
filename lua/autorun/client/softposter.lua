@@ -832,7 +832,7 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 			j = j + 1
 
 			local cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles)
-			local lastpass
+			local lastpass = 1
 			while cont do
 				progressbar[2].progress = j + vlpass-1
 				progressbar[3].progress = vlpindex

@@ -165,8 +165,10 @@ function ENT:HeavyLightTick(viewang)
 		local lamppos, lampang = self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles()
 		local viewpos = viewang:Forward()
 		local lviewpos = WorldToLocal(viewpos, angle_zero, vector_origin, lampang)
+		lviewpos:Normalize()
 		lviewpos.x = 0
-		local roll = math.Round(lviewpos:Angle().pitch)
+		viewang = lviewpos:Angle()
+		local roll = viewang.pitch * (lviewpos.y < 0 and 1 or -1)
 		local passmod = ((self.HeavyLightVLPlanePass-1) / self.HeavyLightVLPPlanePassMax)*180
 		roll = roll + passmod
 
@@ -174,7 +176,6 @@ function ENT:HeavyLightTick(viewang)
 		local worldpos, worldang
 		worldpos, worldang = LocalToWorld(vector_origin, Angle(0, 0, roll), vector_origin, lampang)
 		worldpos, worldang = LocalToWorld(vector_origin, Angle(0, ang, 0), lamppos, worldang)
-
 		--print(worldpos, worldang)
 
 		self.HeavyLightVLPlane:SetPos(worldpos)
