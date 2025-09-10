@@ -98,7 +98,7 @@ function ENT:HeavyLightStart(brightness, lampcount, vlplanecount, vlpasscount)
 		self.HeavyLightVLPPlanePassMax = vlpasscount
 		self.HeavyLightVLPlane = ClientsideModel("models/vlplane/vlplane.mdl", RENDERGROUP_TRANSLUCENT)
 		self.HeavyLightVLPlane:SetNoDraw(false)--true)	-- wait until it's being activated
-		self.HeavyLightVLPlane:SetModelScale(10000)
+		self.HeavyLightVLPlane:SetModelScale(1500)
 	else
 		self.HeavyLightVLPlanePass = nil
 		self.HeavyLightVLPlaneIndex = nil
@@ -172,10 +172,10 @@ function ENT:HeavyLightTick(viewang)
 		local passmod = ((self.HeavyLightVLPlanePass-1) / self.HeavyLightVLPPlanePassMax)*180
 		roll = roll + passmod
 
-		local ang = math.Remap(self.HeavyLightVLPlaneIndex, min, max, -fov, fov)
+		local ang = (min ~= max) and math.Remap(self.HeavyLightVLPlaneIndex, min, max, -fov, fov) or 0
 		local worldpos, worldang
-		worldpos, worldang = LocalToWorld(vector_origin, Angle(0, 0, roll), vector_origin, lampang)
-		worldpos, worldang = LocalToWorld(vector_origin, Angle(0, ang, 0), lamppos, worldang)
+		worldpos, worldang = LocalToWorld(vector_origin, Angle(0, 0, roll), lamppos, lampang)
+		worldang:RotateAroundAxis(worldang:Up(), ang)
 		--print(worldpos, worldang)
 
 		self.HeavyLightVLPlane:SetPos(worldpos)
