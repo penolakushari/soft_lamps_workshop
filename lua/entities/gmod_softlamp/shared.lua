@@ -9,6 +9,9 @@ ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.PrintName = "Soft Lamp"
 ENT.Editable	= true	-- Set to FALSE after making a custom edit menu - but keep the Edit values defined to enable using the same system in the custom edit menu.
 
+---@class gmod_softlamp: ENT
+local ENT = ENT
+
 --[[---------------------------------------------------------
    Name: SetupDataTables
    Desc: Define Network Variables

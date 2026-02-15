@@ -548,6 +548,7 @@ local function SoftPoster(postermul, split)
 	local starttime = SysTime()	-- benchmarking + feedback
 	local timelimit, predicttime = Abort_TimeVar:GetFloat(), Abort_PredictTimeVar:GetBool()
 
+	---@type {[gmod_softlamp]: integer}
 	local lights = {}
 	local softlamps = ents.FindByClass("gmod_softlamp")
 
@@ -589,11 +590,20 @@ local function SoftPoster(postermul, split)
 
 	local abort = false
 
+	local lampc = lampcount:GetInt()
+	if lampc < 1 then lampc = 1 end
+	
+	---@type ProjectedTexture[]
+	local pts = {}
+	for _ = 1, lampc do
+		local pt = ProjectedTexture()
+		pt:SetEnableShadows(true)
+		pt:Update()
+		table.insert(pts, pt)
+	end
+
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
-
-		local lampc = lampcount:GetInt()
-		if lampc < 1 then lampc = 1 end
 
 		i = 0
 
@@ -604,11 +614,11 @@ local function SoftPoster(postermul, split)
 		for lamp, brightness in pairs(lights) do
 			if abort then break end
 
-			lamp:HeavyLightStart(brightness, lampc)
+			lamp:HeavyLightStart(brightness, nil, nil, pts)
 			local lightc = lamp:HeavyLightCount()
 			local lightadd = 0
 
-			while lamp:HeavyLightTick() do
+			while lamp:HeavyLightTick(nil, pts) do
 				if (timelimit > 0) and not abort then
 					abort = AbortTime(timelimit, starttime)
 				end
@@ -629,6 +639,10 @@ local function SoftPoster(postermul, split)
 		callsleft = callsleft - 1
 		if (callsleft <= 0) then
 			hook.Remove("RenderScene","SoftPoster")
+
+			for _, pt in ipairs(pts) do
+				pt:Remove()
+			end
 
 			local endtime = SysTime()
 			print("Poster finished with the following values:")
