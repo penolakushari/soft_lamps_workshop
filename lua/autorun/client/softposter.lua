@@ -1,6 +1,11 @@
+---@module "softlamps.client.frustrumcheck"
+local frustrum = include("softlamps/client/frustrum.lua")
+
 --print("\tIF YOU SEE THIS TELL NEATNIT!! SoftPoster just got loaded!")
 --local extraframes = CreateClientConVar("poster_extraframes", "0")
 local lampcount = CreateClientConVar("poster_uselampcount", "1", true, false, "Soft Lamps: Amount of lamps to enable during 1 render tick", 1, 8)
+local checkfrustrum = CreateClientConVar("poster_checkfrustrum", "1", true, false, "Soft Lamps: Check if the view frustrum intersects with lamp frustrum. Expensive on initialization but may potentially result in less render time", 0, 1)
+local checkfrustrum_farz = CreateClientConVar("poster_checkfrustrum_farz", "-1", true, false, "Soft Lamps: Override farz for frustrum checks", -1)
 
 local tex_render = render.GetSuperFPTex()
 local tex_blend  = render.GetSuperFPTex2()
@@ -567,10 +572,31 @@ local function SoftPoster(postermul, split)
 	local lights = {}
 	---@type gmod_softlamp[]
 	local softlamps = ents.FindByClass("gmod_softlamp")
+	local frustrumCheck = checkfrustrum:GetBool()
+	local frustrumFarZ = checkfrustrum_farz:GetFloat()
+
+	local viewFrustrum
+	if frustrumCheck then
+		local view = render.GetViewSetup()
+		view.zfar = frustrumFarZ > 0 and frustrumFarZ or view.zfar
+		viewFrustrum = frustrum.get(view)
+	end
 
 	local lightcount = 0
 	for k, lamp in pairs(softlamps) do
 		if !lamp:GetHeavyOn() then continue end
+		if frustrumCheck then
+			local lampFrustrum = frustrum.get({
+				fov_unscaled = lamp:GetLightFOV(),
+				origin = lamp:LocalToWorld(lamp:GetLightOffset()),
+				angles = lamp:GetAngles(),
+				znear = lamp:GetNearZ(),
+				zfar = lamp:GetFarZ(),
+				aspect = 1,
+			})
+			if not frustrum.intersects(viewFrustrum, lampFrustrum) then continue end
+		end
+
 		local c = lamp:HeavyLightCount()
 		lightcount = lightcount + c
 		lights[lamp] = c
@@ -676,9 +702,31 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 	---@type gmod_softlamp[]
 	local softlamps = ents.FindByClass("gmod_softlamp")
 
+	local frustrumCheck = checkfrustrum:GetBool()
+	local frustrumFarZ = checkfrustrum_farz:GetFloat()
+
+	local viewFrustrum
+	if frustrumCheck then
+		local view = render.GetViewSetup()
+		view.zfar = frustrumFarZ > 0 and frustrumFarZ or view.zfar
+		viewFrustrum = frustrum.get(view)
+	end
+
 	local lightcount = 0
 	for k, lamp in pairs(softlamps) do
 		if !lamp:GetHeavyOn() then continue end
+		if frustrumCheck then
+			local lampFrustrum = frustrum.get({
+				fov_unscaled = lamp:GetLightFOV(),
+				origin = lamp:LocalToWorld(lamp:GetLightOffset()),
+				angles = lamp:GetAngles(),
+				znear = lamp:GetNearZ(),
+				zfar = lamp:GetFarZ(),
+				aspect = 1,
+			})
+			if not frustrum.intersects(viewFrustrum, lampFrustrum) then continue end
+		end
+
 		local c = lamp:HeavyLightCount()
 		lightcount = lightcount + c
 		lights[lamp] = c
@@ -714,8 +762,8 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 
 	local abort = false
 
-		local lampc = lampcount:GetInt()
-		if lampc < 1 then lampc = 1 end
+	local lampc = lampcount:GetInt()
+	if lampc < 1 then lampc = 1 end
 
 	local pts, removePTs = StoreProjectedTextures(lampc)
 
