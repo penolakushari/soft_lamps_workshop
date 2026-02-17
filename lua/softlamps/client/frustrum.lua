@@ -16,9 +16,18 @@
 ---@field up Vector
 ---@field down Vector
 
+---@class FrustrumDistances
+---@field near number
+---@field far number
+---@field left number
+---@field right number
+---@field up number
+---@field down number
+
 ---@class FrustrumData
 ---@field vertices {far: FrustrumVertices, near: FrustrumVertices}
 ---@field planes FrustrumPlanes
+---@field distances FrustrumDistances
 
 
 ---@param view ViewSetup
@@ -45,12 +54,14 @@ local function GetFrustrum(view)
 
 	local nearCenter = origin + nearz*forward
 	local farCenter = origin + farz*forward
+	---@type FrustrumVertices
 	local nearData = {
 		topleft = nearCenter - right*wNear + up*hNear,
 		topright = nearCenter + right*wNear + up*hNear,
 		bottomleft = nearCenter - right*wNear - up*hNear,
 		bottomright = nearCenter + right*wNear - up*hNear,
 	}
+	---@type FrustrumVertices
 	local farData = {
 		topleft = farCenter - right*wFar + up*hFar,
 		topright = farCenter + right*wFar + up*hFar,
@@ -58,18 +69,38 @@ local function GetFrustrum(view)
 		bottomright = farCenter + right*wFar - up*hFar,	
 	}
 
+	local centerData = {
+		near = nearCenter,
+		far = farCenter,
+		left = (farData.topleft + nearData.bottomleft + farData.bottomleft + nearData.topleft) * 0.25,
+		right = (farData.topright + nearData.bottomright + farData.bottomright + nearData.topright) * 0.25,
+		up = (farData.topleft + nearData.topright + farData.topright + nearData.topleft) * 0.25,
+		down = (farData.bottomleft + nearData.bottomright + farData.bottomright + nearData.bottomleft) * 0.25,
+	}
+
+	local planeData = {
+		near = forward,
+		far = -forward,
+		left = (forward * nearz - right * wNear):GetNormalized():Cross(up),
+		right = (forward * nearz + right * wNear):GetNormalized():Cross(-up),
+		up = (forward * nearz + up * hNear):GetNormalized():Cross(right),
+		down = (forward * nearz - up * hNear):GetNormalized():Cross(-right)
+	}
+
+
 	return {
 		vertices = {
 			far = farData,
 			near = nearData
 		},
-		planes = {
-			near = forward,
-			far = -forward,
-			left = (forward * nearz - right * wNear):GetNormalized():Cross(up),
-			right = (forward * nearz + right * wNear):GetNormalized():Cross(-up),
-			up = (forward * nearz + up * hNear):GetNormalized():Cross(right),
-			down = (forward * nearz - up * hNear):GetNormalized():Cross(-right)
+		planes = planeData,
+		distances = {
+			near = -planeData.near:Dot(centerData.near),
+			far = -planeData.far:Dot(centerData.far),
+			up = -planeData.up:Dot(centerData.up),
+			down = -planeData.down:Dot(centerData.down),
+			right = -planeData.right:Dot(centerData.right),
+			left = -planeData.left:Dot(centerData.left),
 		}
 	}
 end
@@ -151,7 +182,28 @@ local function FrustrumInViewFrustrum(view, lamp)
 	return true
 end
 
+---@param view FrustrumData
+---@param pos Vector
+---@param radius number
+---@return boolean
+local function SphereInViewFrustrum(view, pos, radius)
+
+	for key, normal in pairs(view.planes) do
+		---@cast normal Vector
+		
+		local d = view.distances[key]
+		local dist = normal:Dot(pos) + d
+		-- print("sphere outside frustrum?", key, dist < -radius)
+		if dist < -radius then
+			return false
+		end
+	end
+
+	return true
+end
+
 return {
     get = GetFrustrum,
-    intersects = FrustrumInViewFrustrum
+    intersectsFrustrum = FrustrumInViewFrustrum,
+	intersectsSphere = SphereInViewFrustrum,
 }

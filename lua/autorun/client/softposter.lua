@@ -594,7 +594,7 @@ local function SoftPoster(postermul, split)
 				zfar = lamp:GetFarZ(),
 				aspect = 1,
 			})
-			if not frustrum.intersects(viewFrustrum, lampFrustrum) then continue end
+			if not frustrum.intersectsFrustrum(viewFrustrum, lampFrustrum) then continue end
 		end
 
 		local c = lamp:HeavyLightCount()
@@ -701,7 +701,6 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 	local lights = {}
 	---@type gmod_softlamp[]
 	local softlamps = ents.FindByClass("gmod_softlamp")
-
 	local frustrumCheck = checkfrustrum:GetBool()
 	local frustrumFarZ = checkfrustrum_farz:GetFloat()
 
@@ -724,7 +723,7 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 				zfar = lamp:GetFarZ(),
 				aspect = 1,
 			})
-			if not frustrum.intersects(viewFrustrum, lampFrustrum) then continue end
+			if not frustrum.intersectsFrustrum(viewFrustrum, lampFrustrum) then continue end
 		end
 
 		local c = lamp:HeavyLightCount()
@@ -1009,6 +1008,17 @@ it? hope it  works  and  hope
 it looks awesome :D
 --]]---------------------------
 
+hook.Remove("PreDrawEffects", "DrawFrustrum")
+-- hook.Add("PreDrawEffects", "DrawFrustrum", function()
+-- 	local viewsetup = render.GetViewSetup()
+-- 	viewsetup.zfar = checkfrustrum_farz:GetFloat() > 0 and checkfrustrum_farz:GetFloat() or viewsetup.zfar
+-- 	local view = frustrum.get(viewsetup)
+-- 	for key, center in pairs(view.centers) do
+-- 		debugoverlay.Axis(center, view.planes[key]:Angle(), checkfrustrum_farz:GetFloat(), 0.2, true)
+-- 	end
+-- end)
+
+hook.Remove("RenderScene","SoftPoster")
 local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul, split, depthres )
 --	local extra = extraframes:GetInt()
 	local callsleft = postermul * postermul --+ extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
@@ -1064,6 +1074,15 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 		pt:SetLinearAttenuation(0)
 		pt:SetQuadraticAttenuation(lightsize)
 	end
+	local frustrumCheck = checkfrustrum:GetBool()
+	local frustrumFarZ = checkfrustrum_farz:GetFloat()
+
+	local viewFrustrum
+	if frustrumCheck then
+		local view = render.GetViewSetup()
+		view.zfar = frustrumFarZ > 0 and frustrumFarZ or view.zfar
+		viewFrustrum = frustrum.get(view)
+	end
 
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
@@ -1078,6 +1097,7 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 			for _, bounce in pairs(PixTable) do
 				i = i + 1
 				progressbar[2].progress = i
+				if not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize) then continue end
 
 				for s = 1, lightpasses do
 					if (lightsize/s > 5) then
@@ -1177,6 +1197,15 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 		pt:SetLinearAttenuation(0)
 		pt:SetQuadraticAttenuation(lightsize)
 	end
+	local frustrumCheck = checkfrustrum:GetBool()
+	local frustrumFarZ = checkfrustrum_farz:GetFloat()
+
+	local viewFrustrum
+	if frustrumCheck then
+		local view = render.GetViewSetup()
+		view.zfar = frustrumFarZ > 0 and frustrumFarZ or view.zfar
+		viewFrustrum = frustrum.get(view)
+	end
 
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
@@ -1191,6 +1220,7 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 			for _, bounce in pairs(PixTable) do
 				i = i + 1
 				progressbar[2].progress = i
+				if not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize) then continue end
 
 				for s = 1, lightpasses do
 					if (lightsize/s > 5) then
