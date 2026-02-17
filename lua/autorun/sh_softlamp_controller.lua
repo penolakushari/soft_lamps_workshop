@@ -212,7 +212,7 @@ if CLIENT then
 	---@param data string
 	---@return boolean?, string
 	local function writePathToTextFile(path, root, data)
-		if string.GetExtensionFromFilename(path) ~= ".txt" then
+		if string.GetExtensionFromFilename(path) ~= "txt" then
 			path = path .. ".txt"
 		end
 
@@ -386,6 +386,8 @@ if CLIENT then
 		else
 			MsgC(RED, "Failed to write to data/", fullPath, "\n")
 		end
+	end, function (cmd, argStr)
+		return autocomplete(lampsRootPath, cmd, argStr)
 	end)
 
 	concommand.Add("softlamps_load", function(ply, cmd, args, argStr)
