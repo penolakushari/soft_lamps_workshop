@@ -552,6 +552,9 @@ local function StoreProjectedTextures(count)
 	local pts = {}
 	for _ = 1, count do
 		local pt = ProjectedTexture()
+		pt:SetBrightness(0)
+		pt:SetFOV(0)
+		pt:Update()
 		table.insert(pts, pt)
 	end
 
@@ -669,6 +672,10 @@ local function SoftPoster(postermul, split)
 			end
 			i = i + lightadd
 		end
+		-- Still capture something if we don't have any soft lamps
+		if i == 0 then
+			DoRender(progressbar)
+		end
 		FinishRender()
 
 		callsleft = callsleft - 1
@@ -684,10 +691,10 @@ local function SoftPoster(postermul, split)
 			print("", "Additive: ", additive or false)
 			print("", "Anti-Aliasing: ", antialias)
 		end
-
+		
 		return true
 	end)
-
+	
 	RunConsoleCommand("poster", postermul, split)
 end
 
@@ -798,6 +805,10 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 			end
 			i = i + lightadd
 		end
+		-- Still capture something if we don't have any soft lamps
+		if i == 0 then
+			DoRenderV2(progressbar)
+		end
 		FinishRenderV2()
 
 		callsleft = callsleft - 1
@@ -812,12 +823,12 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 			print("", "Darkness: ", darken)
 			print("", "Additive: ", additive or false)
 			print("", "Anti-Aliasing: ", antialias)
+			RunConsoleCommand("poster", postermul, split)
 		end
 
 		return true
 	end)
 
-	RunConsoleCommand("poster", postermul, split)
 end
 
 local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
@@ -1062,7 +1073,7 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 	lightsize = lightsize + 0
 	for _, pt in pairs(PTs) do
 		pt:SetTexture("effects/flashlight/square")--"models/debug/debugwhite")
-		pt:SetColor(Color(255, 255, 0))
+		pt:SetColor(Color(0, 0, 0))
 		pt:SetBrightness((lightbright + 0)/lightpasses)	-- +0 to convert from string to number
 		pt:SetEnableShadows(true)
 		pt:SetNearZ(GlobalNearZ)
@@ -1073,6 +1084,7 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 		pt:SetConstantAttenuation(0)
 		pt:SetLinearAttenuation(0)
 		pt:SetQuadraticAttenuation(lightsize)
+		pt:Update()
 	end
 	local frustrumCheck = checkfrustrum:GetBool()
 	local frustrumFarZ = checkfrustrum_farz:GetFloat()
@@ -1112,6 +1124,10 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 					end
 				end
 			end
+		end
+		-- Still capture something if we don't have any soft lamps
+		if i == 0 then
+			DoRender(progressbar)
 		end
 		FinishRender()
 
@@ -1185,7 +1201,7 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 	lightsize = lightsize + 0
 	for _, pt in pairs(PTs) do
 		pt:SetTexture("effects/flashlight/square")--"models/debug/debugwhite")
-		pt:SetColor(Color(255, 255, 0))
+		pt:SetColor(Color(0, 0, 0))
 		pt:SetBrightness((lightbright + 0)/lightpasses)	-- +0 to convert from string to number
 		pt:SetEnableShadows(true)
 		pt:SetNearZ(GlobalNearZ)
@@ -1196,6 +1212,7 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 		pt:SetConstantAttenuation(0)
 		pt:SetLinearAttenuation(0)
 		pt:SetQuadraticAttenuation(lightsize)
+		pt:Update()
 	end
 	local frustrumCheck = checkfrustrum:GetBool()
 	local frustrumFarZ = checkfrustrum_farz:GetFloat()
@@ -1235,6 +1252,10 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 					end
 				end
 			end
+		end
+		-- Still capture something if we don't have any soft lamps
+		if i == 0 then
+			DoRenderV2(progressbar)
 		end
 		FinishRenderV2()
 
