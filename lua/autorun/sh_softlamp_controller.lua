@@ -119,6 +119,10 @@ local function setSoftLampState(softlamp, state)
 	end
 end
 
+local RED = Color(255, 0, 0)
+local YELLOW = Color(255, 255, 0)
+local GREEN = Color(0, 255, 0)
+
 if CLIENT then
 	SoftLampHoveredVar = SoftLampHoveredVar or nil -- This is also defined in Soft Lamp Manager client - to get when we hover over lamp panel
 
@@ -272,9 +276,6 @@ if CLIENT then
 		return suggestions
 	end
 
-	local RED = Color(255, 0, 0)
-	local YELLOW = Color(255, 255, 0)
-	local GREEN = Color(0, 255, 0)
 	concommand.Add("lightbounce_save", function(ply, cmd, args, argStr)
 		if not istable(SoftLampsBounceTable) then
 			return
@@ -404,50 +405,16 @@ if CLIENT then
 		local loadPath, replace = args[1], Either(args[2] ~= nil, tobool(args[2]), false)
 		loadPath = parsePathToLoad(loadPath, lampsRootPath)
 
-		local json = file.Read(loadPath, "DATA")
-		local success, err = pcall(function()
-			if json then
-				local lampArray = util.JSONToTable(json)
-				local count = #lampArray
-				if count == 0 then return end
+		net.Start("softlamp_load")
+		net.WriteString(loadPath)
+		net.WriteBool(replace)
+		net.SendToServer()
 
-				net.Start("softlamp_load")
-				net.WriteBool(replace)
-				net.SendToServer()
-
-				local i = 1
-				timer.Create("softlamp_load_batch", 0.001, math.ceil(count / SOFTLAMPS_BANDWIDTH) + 1, function()
-					net.Start("softlamp_load_batch", true)
-					net.WriteBool(i >= count)
-					for j = 0, SOFTLAMPS_BANDWIDTH - 1 do
-						local data = lampArray[i + j]
-						net.WriteBool(data ~= nil)
-						if data then
-							net.WriteTable(data)
-						end
-					end
-					net.SendToServer()
-					i = i + SOFTLAMPS_BANDWIDTH
-				end)
-			end
-		end)
-
-		if success then
-			MsgC(
-				GREEN,
-				replace and "Successfully replaced the scene with data/" .. loadPath or "Successfully appended data/" .. loadPath,
-				"!\n"
-			)
-		else
-			MsgC(RED, "An error occurred when attempting to load data/", loadPath, "\n", err)
-			MsgC(RED, "Please report this to the following link:")
-			MsgC(RED, SOURCE_URL)
-		end
 	end, function (cmd, argStr)
 		return autocomplete(lampsRootPath, cmd, argStr)
 	end)
 
-	net.Receive("softlamp_load_batch", function (len, ply)
+	net.Receive("softlamp_load", function (len, ply)
 		notification.AddLegacy("Finished loading soft lamp scene data", NOTIFY_GENERIC, 3)
 	end)
 
@@ -576,45 +543,62 @@ else
 		end
 	end)
 
-	util.AddNetworkString("softlamp_load_batch")
-	net.Receive("softlamp_load_batch", function (len, ply)
-		local done = net.ReadBool()
-
-		if not done then
-			for _ = 1, SOFTLAMPS_BANDWIDTH do
-				local dataExists = net.ReadBool()
-				if not dataExists then
-					return
-				end
-				local data = net.ReadTable()
-				local lamp = spawnLamp(ply, data)
-				if lamp then
-					undo.AddEntity(lamp)
-				end
-			end
-		end
-
-		if done then
-			undo.Finish()
-			net.Start("softlamp_load_batch")
-			net.Send(ply)
-		end
-	end)
-
 	util.AddNetworkString("softlamp_load")
 	net.Receive("softlamp_load", function (len, ply)
+		local loadPath = net.ReadString()
 		local replace = net.ReadBool()
-		---@type SoftLampData[]
-		---@
 
-		if replace then
-			for _, softLamp in ipairs(GetAllSoftLamps()) do
-				softLamp:Remove()
-			end
-		end
+		local json = file.Read(loadPath, "DATA")
 
 		undo.Create("Soft lamps scene data")
 		undo.SetPlayer(ply)
+		local success, err = pcall(function()
+			if json then
+				---@type SoftLampData[]
+				local lampArray = util.JSONToTable(json)
+				local count = #lampArray
+				if count == 0 then return end
+
+				if replace then
+					for _, softLamp in ipairs(GetAllSoftLamps()) do
+						softLamp:Remove()
+					end
+				end
+
+				local i = 1
+				timer.Create("softlamp_load_batch", 0.001, math.ceil(count / SOFTLAMPS_BANDWIDTH), function()
+					for j = 0, SOFTLAMPS_BANDWIDTH - 1 do
+						local data = lampArray[i + j]
+						if data then
+							local lamp = spawnLamp(ply, data)
+							if lamp then
+								undo.AddEntity(lamp)
+							end
+						end
+					end
+					i = i + SOFTLAMPS_BANDWIDTH
+
+					if i > count then
+						undo.Finish()
+						net.Start("softlamp_load")
+						net.Send(ply)
+					end
+				end)
+			end
+		end)
+
+		if success then
+			MsgC(
+				GREEN,
+				replace and "Successfully replaced the scene with data/" .. loadPath or "Successfully appended data/" .. loadPath,
+				"!\n"
+			)
+		else
+			MsgC(RED, "An error occurred when attempting to load data/", loadPath, "\n", err)
+			MsgC(RED, "Please report this to the following link:")
+			MsgC(RED, SOURCE_URL)
+			undo.Finish()
+		end
 	end)
 
 	util.AddNetworkString("softlamp_state")
