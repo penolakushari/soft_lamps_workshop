@@ -1,4 +1,4 @@
----@module "softlamps.client.frustrumcheck"
+---@module "softlamps.client.frustrum"
 local frustrum = include("softlamps/client/frustrum.lua")
 
 --print("\tIF YOU SEE THIS TELL NEATNIT!! SoftPoster just got loaded!")

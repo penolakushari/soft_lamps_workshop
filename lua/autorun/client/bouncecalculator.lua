@@ -1,4 +1,6 @@
 require("vtrace")
+---@module "softlamps.client.frustrum"
+local frustrum = include("softlamps/client/frustrum.lua")
 
 SoftLampsBounceTable = {}
 
@@ -23,9 +25,30 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 --	end
 
 	local function DoBounce()
-
+		local frustrumCheck = GetConVar("poster_checkfrustrum"):GetBool()
+		local frustrumFarZ = GetConVar("poster_checkfrustrum_farz"):GetFloat()
 		if tonumber(Args[1]) and tonumber(Args[2]) then
+			local viewFrustrum
+			if frustrumCheck then
+				---@type ViewSetup
+				local view = render.GetViewSetup()
+				view.zfar = frustrumFarZ > 0 and frustrumFarZ or view.zfar
+				viewFrustrum = frustrum.get(view)
+			end
+
 			for _, SoftLamp in pairs(ents.FindByClass("gmod_softlamp")) do
+				if frustrumCheck then
+					local lampFrustrum = frustrum.get({
+						fov_unscaled = SoftLamp:GetLightFOV(),
+						origin = SoftLamp:LocalToWorld(SoftLamp:GetLightOffset()),
+						angles = SoftLamp:GetAngles(),
+						znear = SoftLamp:GetNearZ(),
+						zfar = SoftLamp:GetFarZ(),
+						aspect = 1,
+					})
+					if not frustrum.intersects(viewFrustrum, lampFrustrum) then continue end
+				end
+
 				if SoftLamp:GetOn() then
 
 					SoftLampsBounceTable[SoftLamp] = {}
@@ -97,18 +120,18 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 	local prevvalue = drawrings:GetInt()
 
 	if prevvalue == 0 then
-		DoBounce()
+		timer.Simple(0.01, DoBounce)
 	else
 		RunConsoleCommand("cl_draweffectrings", 0)
 		print("cl_draweffectrings is "..prevvalue.." ! Setting it to 0!")
 
-		DoBounce()
+		timer.Simple(0.01, DoBounce)
 
-		timer.Simple(0, function()
+		timer.Simple(0.02, function()
 			print("Restoring cl_draweffectrings...")
 			RunConsoleCommand("cl_draweffectrings", prevvalue)
 		end)
-
+		print("If the game is paused, unpause it to start the lightbounce calculation")
 	end
 end)
 
@@ -218,17 +241,18 @@ concommand.Add("lightspray_calculate", function(Ply, Cmd, Args)
 	local prevvalue = drawrings:GetInt()
 
 	if prevvalue == 0 then
-		DoBounce()
+		timer.Simple(0.01, DoBounce)
 	else
 		RunConsoleCommand("cl_draweffectrings", 0)
 		print("cl_draweffectrings is "..prevvalue.." ! Setting it to 0!")
 
-		DoBounce()
+		timer.Simple(0.01, DoBounce)
 
-		timer.Simple(0, function()
+		timer.Simple(0.02, function()
 			print("Restoring cl_draweffectrings...")
 			RunConsoleCommand("cl_draweffectrings", prevvalue)
 		end)
+		print("If the game is paused, unpause it to start the lightbounce calculation")
 
 	end
 end)
@@ -313,27 +337,28 @@ concommand.Add("lightspray_calculate_advanced", function(Ply, Cmd, Args)
 		print("softlamps_bbox is "..lampbbox.." ! Setting it to 0!")
 	end
 
-	DoBounce()
+	timer.Simple(0.01, DoBounce)
 
 	if drawrings == 0 then
-		timer.Simple(0, function()
+		timer.Simple(0.02, function()
 			print("Restoring cl_draweffectrings...")
 			RunConsoleCommand("cl_draweffectrings", drawrings)
 		end)
 	end
 	if lampbbox == 0 then
-		timer.Simple(0, function()
+		timer.Simple(0.02, function()
 			print("Restoring softlamps_bbox...")
 			RunConsoleCommand("softlamps_bbox", lampbbox)
 		end)
 	end
+	print("If the game is paused, unpause it to start the lightbounce calculation")
 
 end)
 
 concommand.Add("reflection_fidelity_helper",function(Ply, Cmd, Args)
 	local F = tonumber(Args[1])
 	if F then
-		if F > 1 || F < 0 then
+		if F > 1 or F < 0 then
 			F = math.Clamp(F, 0, 1)
 			print("Fidelity must be within 0-1 range. Clamping.")
 			print("")
@@ -386,7 +411,7 @@ hook.Add("HUDPaint", "Show Debug", function()
 end)
 
 concommand.Add("lightbounce_debug_size",function(Ply, Cmd, Args)
-	if isnumber(Args[1]) then
+	if tonumber(Args[1]) then
 		spriteSize = Args[1]
 	end
 end)
