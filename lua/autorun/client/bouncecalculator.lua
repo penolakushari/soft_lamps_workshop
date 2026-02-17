@@ -18,6 +18,11 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 		return
 	end
 
+	if not tonumber(Args[1]) or not tonumber(Args[2]) then
+		print("lightbounce_calculate <Accuracy> <Interval>")
+		return
+	end
+
 --	local draweffectrings = GetConVar("cl_draweffectrings"):GetInt()
 --	if draweffectrings == 1 then
 --		print("cl_draweffectrings is "..draweffectrings.." ! Set it to 0!")
@@ -46,7 +51,7 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 						zfar = SoftLamp:GetFarZ(),
 						aspect = 1,
 					})
-					if not frustrum.intersects(viewFrustrum, lampFrustrum) then continue end
+					if not frustrum.intersectsFrustrum(viewFrustrum, lampFrustrum) then continue end
 				end
 
 				if SoftLamp:GetOn() then
@@ -110,8 +115,6 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 					--end
 				end
 			end
-		else
-			print("lightbounce_calculate <Accuracy> <Interval>")
 		end
 
 	end
@@ -178,63 +181,62 @@ concommand.Add("lightspray_calculate", function(Ply, Cmd, Args)
 --		return
 --	end
 
+	if not tonumber(Args[1]) or not tonumber(Args[2]) or not tonumber(Args[3]) then
+		print("lightspray_calculate <Accuracy> <Interval> <Distance>")
+		return
+	end
+
 	local function DoBounce()
 
-		if tonumber(Args[1]) and tonumber(Args[2]) and tonumber(Args[3]) then
+		local ViewEnt = GetViewEntity()
+		ViewEnt:SetNoDraw(true)
+		Ply:SetNoDraw(true)
 
-			local ViewEnt = GetViewEntity()
-			ViewEnt:SetNoDraw(true)
-			Ply:SetNoDraw(true)
+		local TraceTable = 	{
+								Slave = Ply,
+								StartPos = Ply:EyePos(),
+								ForwardAngle = Ply:EyeAngles(),
+								FOV = Ply:GetFOV(),
+								NearZ = 1,
+								FarZ = tonumber(Args[3]),
+								AccuracyTolerance = tonumber(Args[1]),
+								ScanRadius = math.max(ScrW(), ScrH()),
+								ScanInterval = tonumber(Args[2]),
+								ScanJitter = 0,
+								PositionOffset = -tonumber(Args[1])*3,
+								EntireScreen = true
+							}
 
-			local TraceTable = 	{
-									Slave = Ply,
-									StartPos = Ply:EyePos(),
-									ForwardAngle = Ply:EyeAngles(),
-									FOV = Ply:GetFOV(),
-									NearZ = 1,
-									FarZ = tonumber(Args[3]),
-									AccuracyTolerance = tonumber(Args[1]),
-									ScanRadius = math.max(ScrW(), ScrH()),
-									ScanInterval = tonumber(Args[2]),
-									ScanJitter = 0,
-									PositionOffset = -tonumber(Args[1])*3,
-									EntireScreen = true
-								}
+		vtrace.DoTrace(TraceTable, function(BounceData)
 
-			vtrace.DoTrace(TraceTable, function(BounceData)
+			ViewEnt:SetNoDraw(false)
+			Ply:SetNoDraw(false)
 
-				ViewEnt:SetNoDraw(false)
-				Ply:SetNoDraw(false)
+			for Pix, PixTable in pairs(BounceData) do
 
-				for Pix, PixTable in pairs(BounceData) do
+				local Col = PixTable.PixelColor
+				local Pos = PixTable.PixelPosition
 
-					local Col = PixTable.PixelColor
-					local Pos = PixTable.PixelPosition
+				BounceData[Pix].PixelDirection = nil
+				BounceData[Pix].PixelColor = nil
+				BounceData[Pix].PixelPosition = nil
 
-					BounceData[Pix].PixelDirection = nil
-					BounceData[Pix].PixelColor = nil
-					BounceData[Pix].PixelPosition = nil
-
-					if Col.r < MinLight and Col.g < MinLight and Col.b < MinLight then -- If color is too dark (below MinLight) then remove it
-						BounceData[Pix] = nil
-					else
-						BounceData[Pix].Col = Col
-						BounceData[Pix].Pos = Pos
-					end
+				if Col.r < MinLight and Col.g < MinLight and Col.b < MinLight then -- If color is too dark (below MinLight) then remove it
+					BounceData[Pix] = nil
+				else
+					BounceData[Pix].Col = Col
+					BounceData[Pix].Pos = Pos
 				end
+			end
 
-				SoftLampsBounceTable[table.Count(SoftLampsBounceTable)+1] = BounceData
+			SoftLampsBounceTable[table.Count(SoftLampsBounceTable)+1] = BounceData
 
-				local Count = 0
-				for Pix, PixTable in pairs(BounceData) do
-					Count = Count + 1
-				end
-				print("Calculated "..Count.." lights for light spray!")
-			end)
-		else
-			print("lightspray_calculate <Accuracy> <Interval> <Distance>")
-		end
-
+			local Count = 0
+			for Pix, PixTable in pairs(BounceData) do
+				Count = Count + 1
+			end
+			print("Calculated "..Count.." lights for light spray!")
+		end)
 	end
 
 	local drawrings = GetConVar("cl_draweffectrings")
@@ -265,62 +267,61 @@ concommand.Add("lightspray_calculate_advanced", function(Ply, Cmd, Args)
 --		return
 --	end
 
+	if not tonumber(Args[1]) or not tonumber(Args[2]) or not tonumber(Args[3]) then
+		print("lightspray_calculate <FOV> <Accuracy> <Scan Radius> <Interval> <Scan Jitter> <Position Offset> <Start Distance> <End Distance>")
+		return
+	end
+
 	local function DoBounce()
 
-		if tonumber(Args[1]) and tonumber(Args[2]) and tonumber(Args[3]) then
+		local ViewEnt = GetViewEntity()
+		ViewEnt:SetNoDraw(true)
+		Ply:SetNoDraw(true)
 
-			local ViewEnt = GetViewEntity()
-			ViewEnt:SetNoDraw(true)
-			Ply:SetNoDraw(true)
+		local TraceTable = 	{
+								Slave = Ply,
+								StartPos = Ply:EyePos(),
+								ForwardAngle = Ply:EyeAngles(),
+								FOV = tonumber(Args[1]),
+								NearZ = tonumber(Args[7]),
+								FarZ = tonumber(Args[8]),
+								AccuracyTolerance = tonumber(Args[2]),
+								ScanRadius = tonumber(Args[3]),
+								ScanInterval = tonumber(Args[4]),
+								ScanJitter = tonumber(Args[5]),
+								PositionOffset = tonumber(Args[6]),
+							}
 
-			local TraceTable = 	{
-									Slave = Ply,
-									StartPos = Ply:EyePos(),
-									ForwardAngle = Ply:EyeAngles(),
-									FOV = tonumber(Args[1]),
-									NearZ = tonumber(Args[7]),
-									FarZ = tonumber(Args[8]),
-									AccuracyTolerance = tonumber(Args[2]),
-									ScanRadius = tonumber(Args[3]),
-									ScanInterval = tonumber(Args[4]),
-									ScanJitter = tonumber(Args[5]),
-									PositionOffset = tonumber(Args[6]),
-								}
+		vtrace.DoTrace(TraceTable, function(BounceData)
 
-			vtrace.DoTrace(TraceTable, function(BounceData)
+			ViewEnt:SetNoDraw(false)
+			Ply:SetNoDraw(false)
 
-				ViewEnt:SetNoDraw(false)
-				Ply:SetNoDraw(false)
+			for Pix, PixTable in pairs(BounceData) do
 
-				for Pix, PixTable in pairs(BounceData) do
+				local Col = PixTable.PixelColor
+				local Pos = PixTable.PixelPosition
 
-					local Col = PixTable.PixelColor
-					local Pos = PixTable.PixelPosition
+				BounceData[Pix].PixelDirection = nil
+				BounceData[Pix].PixelColor = nil
+				BounceData[Pix].PixelPosition = nil
 
-					BounceData[Pix].PixelDirection = nil
-					BounceData[Pix].PixelColor = nil
-					BounceData[Pix].PixelPosition = nil
-
-					if Col.r < MinLight and Col.g < MinLight and Col.b < MinLight then -- If color is too dark (below MinLight) then remove it
-						BounceData[Pix] = nil
-					else
-						BounceData[Pix].Col = Col
-						BounceData[Pix].Pos = Pos
-					end
+				if Col.r < MinLight and Col.g < MinLight and Col.b < MinLight then -- If color is too dark (below MinLight) then remove it
+					BounceData[Pix] = nil
+				else
+					BounceData[Pix].Col = Col
+					BounceData[Pix].Pos = Pos
 				end
+			end
 
-				SoftLampsBounceTable[table.Count(SoftLampsBounceTable)+1] = BounceData
+			SoftLampsBounceTable[table.Count(SoftLampsBounceTable)+1] = BounceData
 
-				local Count = 0
-				for Pix, PixTable in pairs(BounceData) do
-					Count = Count + 1
-				end
-				print("Calculated "..Count.." lights for light spray!")
-			end)
-		else
-			print("lightspray_calculate <FOV> <Accuracy> <Scan Radius> <Interval> <Scan Jitter> <Position Offset> <Start Distance> <End Distance>")
-		end
-
+			local Count = 0
+			for Pix, PixTable in pairs(BounceData) do
+				Count = Count + 1
+			end
+			print("Calculated "..Count.." lights for light spray!")
+		end)
 	end
 
 	local drawrings = GetConVar("cl_draweffectrings")
