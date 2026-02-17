@@ -1,3 +1,7 @@
+AddCSLuaFile("softlamps/client/fzy.lua")
+---@module "softlamps.client.fzy"
+local fzy = include("softlamps/client/fzy.lua")
+
 ---@class SoftLamp: ENT
 ---@field SetHeavyOn fun(self: SoftLamp, enabled: boolean)
 ---@field GetHeavyOn fun(self: SoftLamp): enabled: boolean
@@ -192,7 +196,7 @@ if CLIENT then
 		if not string.find(path, root) then
 			path = root .. "/" .. path
 		end
-		if string.GetExtensionFromFilename(path) ~= ".txt" then
+		if string.GetExtensionFromFilename(path) ~= "txt" then
 			path = path .. ".txt"
 		end
 
@@ -251,6 +255,23 @@ if CLIENT then
 		file.CreateDir(lampsRootPath)
 	end
 
+	local function autocomplete(root, cmd, text)
+		local files, dirs = file.Find(root .. "/" .. string.Trim(text) .. "*", "DATA")
+		table.Add(dirs or {}, files or {})
+
+		local text = string.Split(text, "/")
+		local fullDirectory = ""
+		for i = 1, #text - 1 do
+			fullDirectory = fullDirectory .. string.TrimLeft(text[i]) .. "/"
+		end
+		local suggestions = {}
+		for _, result in ipairs(fzy.filter(string.Trim(text[#text]), dirs, false)) do
+			table.insert(suggestions, cmd .. " " .. fullDirectory .. dirs[result[1]])
+		end
+
+		return suggestions
+	end
+
 	local RED = Color(255, 0, 0)
 	local YELLOW = Color(255, 255, 0)
 	local GREEN = Color(0, 255, 0)
@@ -282,6 +303,8 @@ if CLIENT then
 		else
 			MsgC(RED, "Failed to write to data/", fullPath, "\n")
 		end
+	end, function (cmd, argStr)
+		return autocomplete(bounceRootPath, cmd, argStr)
 	end)
 
 	concommand.Add("lightbounce_load", function(ply, cmd, args, argStr)
@@ -327,6 +350,8 @@ if CLIENT then
 			MsgC(RED, "Please report this to the following link:")
 			MsgC(RED, SOURCE_URL)
 		end
+	end, function (cmd, argStr)
+		return autocomplete(bounceRootPath, cmd, argStr)
 	end)
 
 	concommand.Add("softlamps_save", function(ply, cmd, args, argStr)
@@ -418,6 +443,8 @@ if CLIENT then
 			MsgC(RED, "Please report this to the following link:")
 			MsgC(RED, SOURCE_URL)
 		end
+	end, function (cmd, argStr)
+		return autocomplete(lampsRootPath, cmd, argStr)
 	end)
 
 	net.Receive("softlamp_load_batch", function (len, ply)
