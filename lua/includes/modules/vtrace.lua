@@ -3,9 +3,9 @@ AddCSLuaFile()
 module("vtrace", package.seeall)
 
 if SERVER then
-	util.AddNetworkString("InitializeClient")
-	util.AddNetworkString("InitializeServer")
-	util.AddNetworkString("FinalizeServer")
+	util.AddNetworkString("vtrace_InitializeClient")
+	util.AddNetworkString("vtrace_InitializeServer")
+	util.AddNetworkString("vtrace_FinalizeServer")
 end
 if CLIENT then
 	VTraceUseRenderHook = false
@@ -31,7 +31,7 @@ end
 
 local MaxPixelsCount = 4000
 if SERVER then
-	net.Receive("FinalizeServer", function()
+	net.Receive("vtrace_FinalizeServer", function()
 		local Scanner = ents.FindByClass("vtrace_scanner")[1]
 
 		local ExpectingCallback = net.ReadBool()
@@ -67,7 +67,7 @@ end
 
 local function FinalizeServer(SequentialPixelsTable, CallbackID)
 	if SequentialPixelsTable and CallbackID then
-		net.Start("FinalizeServer", false)
+		net.Start("vtrace_FinalizeServer", false)
 			net.WriteBool(true)
 			net.WriteString(CallbackID)
 			net.WriteUInt(math.min(table.Count(SequentialPixelsTable), MaxPixelsCount), 32)
@@ -81,7 +81,7 @@ local function FinalizeServer(SequentialPixelsTable, CallbackID)
 			end
 		net.SendToServer()
 	else
-		net.Start("FinalizeServer", false)
+		net.Start("vtrace_FinalizeServer", false)
 			net.WriteBool(false)
 		net.SendToServer()
 	end
@@ -380,8 +380,57 @@ local function InitializeClient(ClientData)
 	VTraceShouldOverrideCalcView = true
 end
 
-net.Receive("InitializeClient", function()
-	local ClientData = net.ReadTable()
+
+local function WriteClientData(data)
+	net.WriteEntity(data.Slave)
+	net.WriteDouble(data.StartPos.x)
+	net.WriteDouble(data.StartPos.y)
+	net.WriteDouble(data.StartPos.z)
+	net.WriteDouble(data.ForwardAngle.p)
+	net.WriteDouble(data.ForwardAngle.y)
+	net.WriteDouble(data.ForwardAngle.r)
+	net.WriteDouble(data.FOV)
+	net.WriteDouble(data.NearZ)
+	net.WriteDouble(data.FarZ)
+	net.WriteDouble(data.AccuracyTolerance)
+	net.WriteDouble(data.ScanRadius)
+	net.WriteDouble(data.ScanInterval)
+	net.WriteDouble(data.ScanJitter)
+	net.WriteDouble(data.PositionOffset)
+	net.WriteBool(tobool(data.EntireScreen))
+	net.WriteBool(data.RanByClient)
+	net.WriteString(data.CallbackID)
+end
+
+local function ReadClientData()
+	local data = {
+		StartPos = vector_origin,
+		ForwardAngle = angle_zero
+	}
+	data.Slave = net.ReadEntity()
+	data.StartPos.x = net.ReadDouble()
+	data.StartPos.y = net.ReadDouble()
+	data.StartPos.z = net.ReadDouble()
+	data.ForwardAngle.p = net.ReadDouble()
+	data.ForwardAngle.y = net.ReadDouble()
+	data.ForwardAngle.r = net.ReadDouble()
+	data.FOV = net.ReadDouble()
+	data.NearZ = net.ReadDouble()
+	data.FarZ = net.ReadDouble()
+	data.AccuracyTolerance = net.ReadDouble()
+	data.ScanRadius = net.ReadDouble()
+	data.ScanInterval = net.ReadDouble()
+	data.ScanJitter = net.ReadDouble()
+	data.PositionOffset = net.ReadDouble()
+	data.EntireScreen = net.ReadBool()
+	data.RanByClient = net.ReadBool()
+	data.CallbackID = net.ReadString()
+
+	return data
+end
+
+net.Receive("vtrace_InitializeClient", function()
+	local ClientData = ReadClientData()
 	InitializeClient(ClientData)
 end)
 
@@ -393,8 +442,8 @@ function StartVTrace(ClientData)
 	Scanner.Slave = Slave
 	Slave:SetViewEntity(Scanner)
 
-	net.Start("InitializeClient")
-		net.WriteTable(ClientData)
+	net.Start("vtrace_InitializeClient")
+		WriteClientData(ClientData)
 	net.Send(Slave)
 end
 
@@ -407,16 +456,16 @@ local function InitializeServer(ClientData)
 end
 
 if SERVER then
-	net.Receive("InitializeServer", function()
-		local ClientData = net.ReadTable()
+	net.Receive("vtrace_InitializeServer", function()
+		local ClientData = ReadClientData()
 		InitializeServer(ClientData)
 	end)
 end
 
 function Initialize(ClientData)
 	if CLIENT then
-		net.Start("InitializeServer")
-			net.WriteTable(ClientData)
+		net.Start("vtrace_InitializeServer")
+			WriteClientData(ClientData)
 		net.SendToServer()
 	else
 		InitializeServer(ClientData)
@@ -425,7 +474,6 @@ end
 
 local CID = 0
 function DoTrace(TT, Callback)
-
 	local P = Entity(1)
 
 	local StartPos=TT.StartPos or P:GetPos()
@@ -510,7 +558,7 @@ function GetSeperations(PixelsTable, MaxSeperation)
 		local CurPos = CurPixTable.Pos
 		local MinSeperation = MaxSeperation
 		for RelPix, RelPixTable in pairs(PixelsTable) do
-			if CurPix != RelPix then
+			if CurPix ~= RelPix then
 				local RelSeperation = RelPixTable.Pos:Distance(CurPos)
 				if RelSeperation < MinSeperation then MinSeperation = RelSeperation end
 			end
