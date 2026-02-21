@@ -6,6 +6,22 @@ local frustrum = include("softlamps/client/frustrum.lua")
 local lampcount = CreateClientConVar("poster_uselampcount", "1", true, false, "Soft Lamps: Amount of lamps to enable during 1 render tick", 1, 8)
 local checkfrustrum = CreateClientConVar("poster_checkfrustrum", "1", true, false, "Soft Lamps: Check if the view frustrum intersects with lamp frustrum. Expensive on initialization but may potentially result in less render time", 0, 1)
 local checkfrustrum_farz = CreateClientConVar("poster_checkfrustrum_farz", "-1", true, false, "Soft Lamps: Override farz for frustrum checks", -1)
+local lightattenuation = CreateClientConVar("poster_lightbounce_attenuation", "quadratic", true, false, "Soft Lamps: Set the attenuation for lightbounces\n\t- quadratic\n\t- linear\n\t- constant")
+local attenuations = {
+	quadratic = true,
+	linear = true,
+	constant = true,
+}
+cvars.AddChangeCallback("poster_lightbounce_attenuation", function (convar, oldValue, newValue)
+	if not attenuations[newValue] then
+		-- Revert the convar to quadratic if the new convar isn't valid
+		return lightattenuation:Revert()
+	end
+end)
+
+local function matchAttenuation(attenuation, target)
+	return attenuation == target and 1 or 0
+end
 
 local tex_render = render.GetSuperFPTex()
 local tex_blend  = render.GetSuperFPTex2()
@@ -1081,9 +1097,9 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 		pt:SetFOV(98.5)	-- works well with effects/flashlight/square IIRC
 
 		-- Set proper attenuation
-		pt:SetConstantAttenuation(0)
-		pt:SetLinearAttenuation(0)
-		pt:SetQuadraticAttenuation(lightsize)
+		pt:SetConstantAttenuation(matchAttenuation(lightattenuation:GetString(), "constant") * lightsize)
+		pt:SetLinearAttenuation(matchAttenuation(lightattenuation:GetString(), "linear") * lightsize)
+		pt:SetQuadraticAttenuation(matchAttenuation(lightattenuation:GetString(), "quadratic") * lightsize)
 		pt:Update()
 	end
 	local frustrumCheck = checkfrustrum:GetBool()
@@ -1109,7 +1125,7 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 			for _, bounce in pairs(PixTable) do
 				i = i + 1
 				progressbar[2].progress = i
-				if not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize) then continue end
+				if frustrumCheck and not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize) then continue end
 
 				for s = 1, lightpasses do
 					if (lightsize/s > 5) then
@@ -1209,9 +1225,9 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 		pt:SetFOV(98.5)	-- works well with effects/flashlight/square IIRC
 
 		-- Set proper attenuation
-		pt:SetConstantAttenuation(0)
-		pt:SetLinearAttenuation(0)
-		pt:SetQuadraticAttenuation(lightsize)
+		pt:SetConstantAttenuation(matchAttenuation(lightattenuation:GetString(), "quadratic") * lightsize)
+		pt:SetLinearAttenuation(matchAttenuation(lightattenuation:GetString(), "quadratic") * lightsize)
+		pt:SetQuadraticAttenuation(matchAttenuation(lightattenuation:GetString(), "quadratic") * lightsize)
 		pt:Update()
 	end
 	local frustrumCheck = checkfrustrum:GetBool()
@@ -1237,7 +1253,7 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 			for _, bounce in pairs(PixTable) do
 				i = i + 1
 				progressbar[2].progress = i
-				if not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize) then continue end
+				if frustrumCheck and not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize) then continue end
 
 				for s = 1, lightpasses do
 					if (lightsize/s > 5) then
