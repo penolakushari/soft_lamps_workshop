@@ -649,6 +649,12 @@ else
 			softlamp:SetHeavyOn(false)
 		end
 	end, nil, "Turn off the heavylights of all soft lamps")
+	
+	concommand.Add("softlamps_torch", function()
+		for _, softlamp in ipairs(GetAllSoftLamps()) do
+			softlamp:SetHeavyOn(true)
+		end
+	end, nil, "Turn on the heavylights of all soft lamps")
 
 	local gameplay = false
 	concommand.Add(
