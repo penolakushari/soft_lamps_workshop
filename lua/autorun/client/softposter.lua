@@ -604,7 +604,7 @@ local function SoftPoster(postermul, split)
 	local lightcount = 0
 	for k, lamp in pairs(softlamps) do
 		if !lamp:GetHeavyOn() then continue end
-		if frustrumCheck then
+		if not lamp:GetAlwaysRender() and frustrumCheck then
 			local lampFrustrum = frustrum.get({
 				fov_unscaled = lamp:GetLightFOV(),
 				origin = lamp:LocalToWorld(lamp:GetLightOffset()),
@@ -737,7 +737,7 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 	local lightcount = 0
 	for k, lamp in pairs(softlamps) do
 		if !lamp:GetHeavyOn() then continue end
-		if frustrumCheck then
+		if not lamp:GetAlwaysRender() and frustrumCheck then
 			local lampFrustrum = frustrum.get({
 				fov_unscaled = lamp:GetLightFOV(),
 				origin = lamp:LocalToWorld(lamp:GetLightOffset()),

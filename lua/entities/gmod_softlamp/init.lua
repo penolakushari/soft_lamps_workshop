@@ -31,6 +31,7 @@ function ENT:Initialize()
 	self:SetShadowsOn(true)
 	self:SetGameplayShadows(true)
 	self:SetLinearAttenuation(100)
+	self:SetAlwaysRender(false)
 end
 
 function ENT:Come()

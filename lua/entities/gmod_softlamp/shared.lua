@@ -80,6 +80,7 @@ function ENT:SetupDataTables()
 	self:NetworkVar("Int",    3, "LinearAttenuation", { KeyName = "linear", 		Edit = { order = orderer(), category = "Extra", type = "Int",   title = "Linear Attenuation", min = 0, max = 100 } })
 	self:NetworkVar("Int",    4, "QuadraticAttenuation", { KeyName = "quadratic",	Edit = { order = orderer(), category = "Extra", type = "Int",   title = "Quadratic Attenuation", min = 0, max = 100 } })
 	self:NetworkVar("Int",    5, "ConstantAttenuation", { KeyName = "constant", 	Edit = { order = orderer(), category = "Extra", type = "Int",   title = "Constant Attenuation", min = 0, max = 100 } })
+	self:NetworkVar("Bool",  12, "AlwaysRender", { KeyName = "alwaysrender", Edit = { order = orderer(), category = "Extra", type = "Boolean", title = "Always Render" } })
 end
 
 -- Everything below this point is practically only used in clientside,
