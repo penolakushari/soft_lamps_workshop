@@ -276,6 +276,55 @@ if CLIENT then
 		return suggestions
 	end
 
+	local function assertLightbounces()
+		if not next(SoftLampsBounceTable) then
+			MsgC(
+				YELLOW,
+				"No light bounce data exists in the scene. Use the Light Sprayer tool to add data to the scene in order to save it\n"
+			)
+			return false
+		end
+
+		return true
+	end
+
+	concommand.Add("lightbounce_decimate", function (ply, cmd, args, argStr)
+		if not istable(SoftLampsBounceTable) then
+			return
+		end
+
+		local ratio = args[1]
+
+		if not ratio then
+			MsgN("lightbounce_decimate <ratio>")
+			MsgN("<ratio> must be a decimal number between 0 and 1.")
+			MsgN("1 means no change")
+			MsgN("0 means remove all lightbounces")
+			MsgN("0.5 means remove half the lightbounces in the scene")
+			return
+		end
+
+		local result = assertLightbounces()
+		if not result then 
+			return
+		end
+
+		ratio = tonumber(ratio)
+		local count = 0
+		local removeCount = 0
+		for k, lamp in pairs(SoftLampsBounceTable) do
+			for Pix, PixTable in pairs(lamp) do
+				count = count + 1
+				if math.random(0, 1) < ratio then
+					removeCount = removeCount + 1
+					lamp[Pix] = nil
+				end
+			end
+		end
+
+		MsgN("Removed ", removeCount, "bounces out of ", count)
+	end)
+
 	concommand.Add("lightbounce_save", function(ply, cmd, args, argStr)
 		if not istable(SoftLampsBounceTable) then
 			return
@@ -288,11 +337,8 @@ if CLIENT then
 			return
 		end
 
-		if not next(SoftLampsBounceTable) then
-			MsgC(
-				YELLOW,
-				"No light bounce data exists in the scene. Use the Light Sprayer tool to add data to the scene in order to save it\n"
-			)
+		local result = assertLightbounces()
+		if not result then 
 			return
 		end
 
