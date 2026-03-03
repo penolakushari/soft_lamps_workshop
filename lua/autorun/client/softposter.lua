@@ -7,6 +7,7 @@ local lampcount = CreateClientConVar("poster_uselampcount", "1", true, false, "S
 local checkfrustrum = CreateClientConVar("poster_checkfrustrum", "1", true, false, "Soft Lamps: Check if the view frustrum intersects with lamp frustrum. Expensive on initialization but may potentially result in less render time", 0, 1)
 local checkfrustrum_farz = CreateClientConVar("poster_checkfrustrum_farz", "-1", true, false, "Soft Lamps: Override farz for frustrum checks", -1)
 local lightattenuation = CreateClientConVar("poster_lightbounce_attenuation", "quadratic", true, false, "Soft Lamps: Set the attenuation for lightbounces\n\t- quadratic\n\t- linear\n\t- constant")
+local lightbounce_skip = CreateClientConVar("poster_lightbounce_skip", "0", true, false, "Soft Lamps: Specify lightbounces to skip renders. 2 means skip every other bounce, and 3 means skip every 3rd bounce", 0)
 local attenuations = {
 	quadratic = true,
 	linear = true,
@@ -1104,6 +1105,7 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 	end
 	local frustrumCheck = checkfrustrum:GetBool()
 	local frustrumFarZ = checkfrustrum_farz:GetFloat()
+	local skip = lightbounce_skip:GetInt()
 
 	local viewFrustrum
 	if frustrumCheck then
@@ -1112,6 +1114,7 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 		viewFrustrum = frustrum.get(view)
 	end
 
+	local miss = 0
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
 
@@ -1125,7 +1128,13 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 			for _, bounce in pairs(PixTable) do
 				i = i + 1
 				progressbar[2].progress = i
-				if frustrumCheck and not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize) then continue end
+				if 
+					(frustrumCheck and not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize)) or
+					(skip > 0 and i % skip == 0)
+				then 
+					miss = miss + 1
+					continue
+				end
 
 				for s = 1, lightpasses do
 					if (lightsize/s > 5) then
@@ -1142,7 +1151,7 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 			end
 		end
 		-- Still capture something if we don't have any soft lamps
-		if i == 0 then
+		if i == miss then
 			DoRender(progressbar)
 		end
 		FinishRender()
@@ -1232,6 +1241,7 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 	end
 	local frustrumCheck = checkfrustrum:GetBool()
 	local frustrumFarZ = checkfrustrum_farz:GetFloat()
+	local skip = lightbounce_skip:GetInt()
 
 	local viewFrustrum
 	if frustrumCheck then
@@ -1240,6 +1250,7 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 		viewFrustrum = frustrum.get(view)
 	end
 
+	local miss = 0
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
 
@@ -1253,7 +1264,13 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 			for _, bounce in pairs(PixTable) do
 				i = i + 1
 				progressbar[2].progress = i
-				if frustrumCheck and not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize) then continue end
+				if 
+					(frustrumCheck and not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize)) or
+					(skip > 0 and i % skip == 0)
+				then
+					miss = miss + 1 
+					continue 
+				end
 
 				for s = 1, lightpasses do
 					if (lightsize/s > 5) then
@@ -1270,7 +1287,7 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 			end
 		end
 		-- Still capture something if we don't have any soft lamps
-		if i == 0 then
+		if i == miss then
 			DoRenderV2(progressbar)
 		end
 		FinishRenderV2()
