@@ -44,8 +44,9 @@ local function GetFrustrum(view)
 	local right = angles:Right()
 	local up = angles:Up()
 
-	local endFog = 9000
-	farz = math.min(farz, endFog)
+	local _, endFog, _ = render.GetFogDistances()
+	local maxDensity = render.GetFogMaxDensity()
+	farz = maxDensity == 0 and farz or math.min(farz, endFog)
 
 	local hNear = math.tan(math.rad(fov) * 0.5) * nearz
 	local hFar = math.tan(math.rad(fov) * 0.5) * farz
