@@ -913,6 +913,8 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 		}
 	}
 
+	local pts, removePTs = StoreProjectedTextures(1)
+
 	local i = 0
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 --[[		if extra > 0 then
@@ -930,10 +932,10 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 		local j = 0
 
 		for lamp, brightness in pairs(lights) do
-			lamp:HeavyLightStart(brightness, godrays, passes)
+			lamp:HeavyLightStart(brightness, godrays, passes, pts)
 			j = j + 1
 
-			local cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles)
+			local cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles, pts)
 			local lastpass = 1
 			while cont do
 				progressbar[2].progress = j + vlpass-1
@@ -946,7 +948,7 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 				SingleRender(vlp, progressbar, vlpindex == 1, camstarts[i])
 				-- DoRender(progressbar)
 
-				cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles)
+				cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles, pts)
 				lastpass = vlpass or lastpass
 			end
 			j = j + lastpass-1
@@ -956,6 +958,8 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 		callsleft = callsleft - 1
 		if (callsleft <= 0) then
 			hook.Remove("RenderScene", "SoftPoster")
+
+			removePTs()
 
 			local endtime = SysTime()
 			print("Poster finished with the following values:")

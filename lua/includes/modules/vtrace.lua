@@ -404,8 +404,8 @@ end
 
 local function ReadClientData()
 	local data = {
-		StartPos = vector_origin,
-		ForwardAngle = angle_zero
+		StartPos = Vector(0, 0, 0),
+		ForwardAngle = Angle(0, 0, 0)
 	}
 	data.Slave = net.ReadEntity()
 	data.StartPos.x = net.ReadDouble()
