@@ -315,14 +315,15 @@ if CLIENT then
 		for k, lamp in pairs(SoftLampsBounceTable) do
 			for Pix, PixTable in pairs(lamp) do
 				count = count + 1
-				if math.random(0, 1) < ratio then
+				local roll = math.random()
+				if roll < ratio then
 					removeCount = removeCount + 1
 					lamp[Pix] = nil
 				end
 			end
 		end
 
-		MsgN("Removed ", removeCount, "bounces out of ", count)
+		MsgN("Removed ", removeCount, " bounces out of ", count)
 	end)
 
 	concommand.Add("lightbounce_save", function(ply, cmd, args, argStr)
