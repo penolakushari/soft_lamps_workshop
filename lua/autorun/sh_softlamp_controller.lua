@@ -1,6 +1,10 @@
 AddCSLuaFile("softlamps/client/fzy.lua")
 ---@module "softlamps.client.fzy"
 local fzy = include("softlamps/client/fzy.lua")
+---@module "softlamps.client.state"
+local state = include("softlamps/client/state.lua")
+
+local getSoftLampState = state.get
 
 ---@class SoftLamp: ENT
 ---@field SetHeavyOn fun(self: SoftLamp, enabled: boolean)
@@ -68,21 +72,6 @@ local function getSoftLampData(lamp)
 	}
 
 	return table.Merge(lampData, external)
-end
-
----@param softlamp SoftLamp
----@return string
-local function getSoftLampState(softlamp)
-	local state = "disabled"
-	if softlamp:GetHeavyOn() and softlamp:GetOn() then
-		state = "enabled"
-	elseif softlamp:GetHeavyOn() then
-		state = "heavylight"
-	elseif softlamp:GetOn() then
-		state = "gameplay"
-	end
-
-	return state
 end
 
 local states = {
@@ -481,12 +470,7 @@ if CLIENT then
 		]]
 	)
 
-	local stateColors = {
-		disabled = Color(128, 128, 128),
-		gameplay = Color(255, 255, 0),
-		heavylight = Color(255, 128, 0),
-		enabled = Color(0, 255, 0),
-	}
+	local stateColors = state.colors
 
 	-- Draw bounding box states
 	hook.Remove("HUDPaint", "softlamps_bbox")
