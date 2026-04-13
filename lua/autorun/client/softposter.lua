@@ -836,12 +836,12 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 			print("", "Darkness: ", darken)
 			print("", "Additive: ", additive or false)
 			print("", "Anti-Aliasing: ", antialias)
-			RunConsoleCommand("poster", postermul, split)
 		end
 
 		return true
 	end)
-
+	
+	RunConsoleCommand("poster", postermul, split)
 end
 
 local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
