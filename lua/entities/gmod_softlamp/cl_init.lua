@@ -58,22 +58,13 @@ end
    Name: HeavyLightStart
    Desc: Indicates to the 
 -----------------------------------------------------------]]
-function ENT:HeavyLightStart(brightness, lampcount, vlplanecount, vlpasscount)
-	if not self.HeavyLightPT then self.HeavyLightPT = {} end
-	if not lampcount then lampcount = 1 end
-
+function ENT:HeavyLightStart(brightness, vlplanecount, vlpasscount, pts)
 	local split = self:GetHeavySplit()
 	local splitf = (split > 1) and (split / 1.16) or split-- 98.5 / 90 = 1.094444 , adjustment for that flashlight square texture
 
-	for k, pt in ipairs(self.HeavyLightPT) do
-		if IsValid(pt) then pt:Remove() end
-	end
-	self.HeavyLightPT = {}
-
 	if IsValid(self.HeavyLightVLPlane) then self.HeavyLightVLPlane:Remove() end
 
-	for i = 1, lampcount do
-		local pt = ProjectedTexture() 
+	for _, pt in ipairs(pts) do
 		pt:SetEnableShadows(self:GetShadowsOn())
 		pt:SetTexture(self:GetFlashlightTexture())
 		pt:SetNearZ(self:GetNearZ())
@@ -85,8 +76,6 @@ function ENT:HeavyLightStart(brightness, lampcount, vlplanecount, vlpasscount)
 		pt:SetConstantAttenuation(self:GetConstantAttenuation())
 		pt:SetColor(self:GetLightColor():ToColor())
 		pt:SetBrightness(brightness * split^2)	-- brightness is dictated from outside
-
-		self.HeavyLightPT[i] = pt
 	end
 
 	self.HeavyLightIndex = 0
@@ -106,7 +95,7 @@ function ENT:HeavyLightStart(brightness, lampcount, vlplanecount, vlpasscount)
 	end
 end
 
-function ENT:HeavyLightTick(viewang)
+function ENT:HeavyLightTick(viewang, pts)
 	local nextpos = true
 
 	if self.HeavyLightVLPlaneIndex then
@@ -126,7 +115,7 @@ function ENT:HeavyLightTick(viewang)
 	if nextpos then
 		local done = false
 
-		for k, pt in ipairs(self.HeavyLightPT) do
+		for k, pt in ipairs(pts) do
 			self.HeavyLightIndex = self.HeavyLightIndex + 1
 
 			if self.HeavyLightIndex > self:HeavyLightCount() then
@@ -151,7 +140,6 @@ function ENT:HeavyLightTick(viewang)
 
 		if done then
 			-- All done.
-			for k, pt in ipairs(self.HeavyLightPT) do pt:Remove() end
 			--if IsValid(self.HeavyLightVLPlane) then self.HeavyLightVLPlane:Remove() end
 			return false
 		end
@@ -162,7 +150,7 @@ function ENT:HeavyLightTick(viewang)
 		local min = 1
 		local max = self.HeavyLightVLPlaneMax
 
-		local lamppos, lampang = self.HeavyLightPT[1]:GetPos(), self.HeavyLightPT[1]:GetAngles()
+		local lamppos, lampang = pts[1]:GetPos(), pts[1]:GetAngles()
 		local viewpos = viewang:Forward()
 		local lviewpos = WorldToLocal(viewpos, angle_zero, vector_origin, lampang)
 		lviewpos:Normalize()
@@ -182,20 +170,13 @@ function ENT:HeavyLightTick(viewang)
 		self.HeavyLightVLPlane:SetAngles(worldang)
 
 		self.HeavyLightVLPlane:SetupBones()
-		self.HeavyLightPT[1]:Update() --?
+		pts[1]:Update() --?
 	end
 
 	return true, self.HeavyLightVLPlane, self.HeavyLightVLPlaneIndex, self.HeavyLightVLPlanePass
 end
 
 function ENT:Think()
-	if self.HeavyLightPT then
-		for k, pt in ipairs(self.HeavyLightPT) do
-			if IsValid(pt) then pt:Remove() end
-		end
-		self.HeavyLightPT = nil
-	end
-
 	if IsValid(self.HeavyLightVLPlane) then
 		self.HeavyLightVLPlane:Remove()
 	end

@@ -1,4 +1,6 @@
 require("vtrace")
+---@module "softlamps.client.frustrum"
+local frustrum = include("softlamps/client/frustrum.lua")
 
 SoftLampsBounceTable = {}
 
@@ -16,6 +18,11 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 		return
 	end
 
+	if not tonumber(Args[1]) or not tonumber(Args[2]) then
+		print("lightbounce_calculate <Accuracy> <Interval>")
+		return
+	end
+
 --	local draweffectrings = GetConVar("cl_draweffectrings"):GetInt()
 --	if draweffectrings == 1 then
 --		print("cl_draweffectrings is "..draweffectrings.." ! Set it to 0!")
@@ -23,9 +30,30 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 --	end
 
 	local function DoBounce()
-
+		local frustrumCheck = GetConVar("poster_checkfrustrum"):GetBool()
+		local frustrumFarZ = GetConVar("poster_checkfrustrum_farz"):GetFloat()
 		if tonumber(Args[1]) and tonumber(Args[2]) then
+			local viewFrustrum
+			if frustrumCheck then
+				---@type ViewSetup
+				local view = render.GetViewSetup()
+				view.zfar = frustrumFarZ > 0 and frustrumFarZ or view.zfar
+				viewFrustrum = frustrum.get(view)
+			end
+
 			for _, SoftLamp in pairs(ents.FindByClass("gmod_softlamp")) do
+				if frustrumCheck then
+					local lampFrustrum = frustrum.get({
+						fov_unscaled = SoftLamp:GetLightFOV(),
+						origin = SoftLamp:LocalToWorld(SoftLamp:GetLightOffset()),
+						angles = SoftLamp:GetAngles(),
+						znear = SoftLamp:GetNearZ(),
+						zfar = SoftLamp:GetFarZ(),
+						aspect = 1,
+					})
+					if not frustrum.intersectsFrustrum(viewFrustrum, lampFrustrum) then continue end
+				end
+
 				if SoftLamp:GetOn() then
 
 					SoftLampsBounceTable[SoftLamp] = {}
@@ -87,8 +115,6 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 					--end
 				end
 			end
-		else
-			print("lightbounce_calculate <Accuracy> <Interval>")
 		end
 
 	end
@@ -97,18 +123,18 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 	local prevvalue = drawrings:GetInt()
 
 	if prevvalue == 0 then
-		DoBounce()
+		timer.Simple(0.01, DoBounce)
 	else
 		RunConsoleCommand("cl_draweffectrings", 0)
 		print("cl_draweffectrings is "..prevvalue.." ! Setting it to 0!")
 
-		DoBounce()
+		timer.Simple(0.01, DoBounce)
 
-		timer.Simple(0, function()
+		timer.Simple(0.02, function()
 			print("Restoring cl_draweffectrings...")
 			RunConsoleCommand("cl_draweffectrings", prevvalue)
 		end)
-
+		print("If the game is paused, unpause it to start the lightbounce calculation")
 	end
 end)
 
@@ -155,80 +181,80 @@ concommand.Add("lightspray_calculate", function(Ply, Cmd, Args)
 --		return
 --	end
 
+	if not tonumber(Args[1]) or not tonumber(Args[2]) or not tonumber(Args[3]) then
+		print("lightspray_calculate <Accuracy> <Interval> <Distance>")
+		return
+	end
+
 	local function DoBounce()
 
-		if tonumber(Args[1]) and tonumber(Args[2]) and tonumber(Args[3]) then
+		local ViewEnt = GetViewEntity()
+		ViewEnt:SetNoDraw(true)
+		Ply:SetNoDraw(true)
 
-			local ViewEnt = GetViewEntity()
-			ViewEnt:SetNoDraw(true)
-			Ply:SetNoDraw(true)
+		local TraceTable = 	{
+								Slave = Ply,
+								StartPos = Ply:EyePos(),
+								ForwardAngle = Ply:EyeAngles(),
+								FOV = Ply:GetFOV(),
+								NearZ = 1,
+								FarZ = tonumber(Args[3]),
+								AccuracyTolerance = tonumber(Args[1]),
+								ScanRadius = math.max(ScrW(), ScrH()),
+								ScanInterval = tonumber(Args[2]),
+								ScanJitter = 0,
+								PositionOffset = -tonumber(Args[1])*3,
+								EntireScreen = true
+							}
 
-			local TraceTable = 	{
-									Slave = Ply,
-									StartPos = Ply:EyePos(),
-									ForwardAngle = Ply:EyeAngles(),
-									FOV = Ply:GetFOV(),
-									NearZ = 1,
-									FarZ = tonumber(Args[3]),
-									AccuracyTolerance = tonumber(Args[1]),
-									ScanRadius = math.max(ScrW(), ScrH()),
-									ScanInterval = tonumber(Args[2]),
-									ScanJitter = 0,
-									PositionOffset = -tonumber(Args[1])*3,
-									EntireScreen = true
-								}
+		vtrace.DoTrace(TraceTable, function(BounceData)
 
-			vtrace.DoTrace(TraceTable, function(BounceData)
+			ViewEnt:SetNoDraw(false)
+			Ply:SetNoDraw(false)
 
-				ViewEnt:SetNoDraw(false)
-				Ply:SetNoDraw(false)
+			for Pix, PixTable in pairs(BounceData) do
 
-				for Pix, PixTable in pairs(BounceData) do
+				local Col = PixTable.PixelColor
+				local Pos = PixTable.PixelPosition
 
-					local Col = PixTable.PixelColor
-					local Pos = PixTable.PixelPosition
+				BounceData[Pix].PixelDirection = nil
+				BounceData[Pix].PixelColor = nil
+				BounceData[Pix].PixelPosition = nil
 
-					BounceData[Pix].PixelDirection = nil
-					BounceData[Pix].PixelColor = nil
-					BounceData[Pix].PixelPosition = nil
-
-					if Col.r < MinLight and Col.g < MinLight and Col.b < MinLight then -- If color is too dark (below MinLight) then remove it
-						BounceData[Pix] = nil
-					else
-						BounceData[Pix].Col = Col
-						BounceData[Pix].Pos = Pos
-					end
+				if Col.r < MinLight and Col.g < MinLight and Col.b < MinLight then -- If color is too dark (below MinLight) then remove it
+					BounceData[Pix] = nil
+				else
+					BounceData[Pix].Col = Col
+					BounceData[Pix].Pos = Pos
 				end
+			end
 
-				SoftLampsBounceTable[table.Count(SoftLampsBounceTable)+1] = BounceData
+			SoftLampsBounceTable[table.Count(SoftLampsBounceTable)+1] = BounceData
 
-				local Count = 0
-				for Pix, PixTable in pairs(BounceData) do
-					Count = Count + 1
-				end
-				print("Calculated "..Count.." lights for light spray!")
-			end)
-		else
-			print("lightspray_calculate <Accuracy> <Interval> <Distance>")
-		end
-
+			local Count = 0
+			for Pix, PixTable in pairs(BounceData) do
+				Count = Count + 1
+			end
+			print("Calculated "..Count.." lights for light spray!")
+		end)
 	end
 
 	local drawrings = GetConVar("cl_draweffectrings")
 	local prevvalue = drawrings:GetInt()
 
 	if prevvalue == 0 then
-		DoBounce()
+		timer.Simple(0.01, DoBounce)
 	else
 		RunConsoleCommand("cl_draweffectrings", 0)
 		print("cl_draweffectrings is "..prevvalue.." ! Setting it to 0!")
 
-		DoBounce()
+		timer.Simple(0.01, DoBounce)
 
-		timer.Simple(0, function()
+		timer.Simple(0.02, function()
 			print("Restoring cl_draweffectrings...")
 			RunConsoleCommand("cl_draweffectrings", prevvalue)
 		end)
+		print("If the game is paused, unpause it to start the lightbounce calculation")
 
 	end
 end)
@@ -241,62 +267,61 @@ concommand.Add("lightspray_calculate_advanced", function(Ply, Cmd, Args)
 --		return
 --	end
 
+	if not tonumber(Args[1]) or not tonumber(Args[2]) or not tonumber(Args[3]) then
+		print("lightspray_calculate <FOV> <Accuracy> <Scan Radius> <Interval> <Scan Jitter> <Position Offset> <Start Distance> <End Distance>")
+		return
+	end
+
 	local function DoBounce()
 
-		if tonumber(Args[1]) and tonumber(Args[2]) and tonumber(Args[3]) then
+		local ViewEnt = GetViewEntity()
+		ViewEnt:SetNoDraw(true)
+		Ply:SetNoDraw(true)
 
-			local ViewEnt = GetViewEntity()
-			ViewEnt:SetNoDraw(true)
-			Ply:SetNoDraw(true)
+		local TraceTable = 	{
+								Slave = Ply,
+								StartPos = Ply:EyePos(),
+								ForwardAngle = Ply:EyeAngles(),
+								FOV = tonumber(Args[1]),
+								NearZ = tonumber(Args[7]),
+								FarZ = tonumber(Args[8]),
+								AccuracyTolerance = tonumber(Args[2]),
+								ScanRadius = tonumber(Args[3]),
+								ScanInterval = tonumber(Args[4]),
+								ScanJitter = tonumber(Args[5]),
+								PositionOffset = tonumber(Args[6]),
+							}
 
-			local TraceTable = 	{
-									Slave = Ply,
-									StartPos = Ply:EyePos(),
-									ForwardAngle = Ply:EyeAngles(),
-									FOV = tonumber(Args[1]),
-									NearZ = tonumber(Args[7]),
-									FarZ = tonumber(Args[8]),
-									AccuracyTolerance = tonumber(Args[2]),
-									ScanRadius = tonumber(Args[3]),
-									ScanInterval = tonumber(Args[4]),
-									ScanJitter = tonumber(Args[5]),
-									PositionOffset = tonumber(Args[6]),
-								}
+		vtrace.DoTrace(TraceTable, function(BounceData)
 
-			vtrace.DoTrace(TraceTable, function(BounceData)
+			ViewEnt:SetNoDraw(false)
+			Ply:SetNoDraw(false)
 
-				ViewEnt:SetNoDraw(false)
-				Ply:SetNoDraw(false)
+			for Pix, PixTable in pairs(BounceData) do
 
-				for Pix, PixTable in pairs(BounceData) do
+				local Col = PixTable.PixelColor
+				local Pos = PixTable.PixelPosition
 
-					local Col = PixTable.PixelColor
-					local Pos = PixTable.PixelPosition
+				BounceData[Pix].PixelDirection = nil
+				BounceData[Pix].PixelColor = nil
+				BounceData[Pix].PixelPosition = nil
 
-					BounceData[Pix].PixelDirection = nil
-					BounceData[Pix].PixelColor = nil
-					BounceData[Pix].PixelPosition = nil
-
-					if Col.r < MinLight and Col.g < MinLight and Col.b < MinLight then -- If color is too dark (below MinLight) then remove it
-						BounceData[Pix] = nil
-					else
-						BounceData[Pix].Col = Col
-						BounceData[Pix].Pos = Pos
-					end
+				if Col.r < MinLight and Col.g < MinLight and Col.b < MinLight then -- If color is too dark (below MinLight) then remove it
+					BounceData[Pix] = nil
+				else
+					BounceData[Pix].Col = Col
+					BounceData[Pix].Pos = Pos
 				end
+			end
 
-				SoftLampsBounceTable[table.Count(SoftLampsBounceTable)+1] = BounceData
+			SoftLampsBounceTable[table.Count(SoftLampsBounceTable)+1] = BounceData
 
-				local Count = 0
-				for Pix, PixTable in pairs(BounceData) do
-					Count = Count + 1
-				end
-				print("Calculated "..Count.." lights for light spray!")
-			end)
-		else
-			print("lightspray_calculate <FOV> <Accuracy> <Scan Radius> <Interval> <Scan Jitter> <Position Offset> <Start Distance> <End Distance>")
-		end
-
+			local Count = 0
+			for Pix, PixTable in pairs(BounceData) do
+				Count = Count + 1
+			end
+			print("Calculated "..Count.." lights for light spray!")
+		end)
 	end
 
 	local drawrings = GetConVar("cl_draweffectrings")
@@ -313,27 +338,28 @@ concommand.Add("lightspray_calculate_advanced", function(Ply, Cmd, Args)
 		print("softlamps_bbox is "..lampbbox.." ! Setting it to 0!")
 	end
 
-	DoBounce()
+	timer.Simple(0.01, DoBounce)
 
 	if drawrings == 0 then
-		timer.Simple(0, function()
+		timer.Simple(0.02, function()
 			print("Restoring cl_draweffectrings...")
 			RunConsoleCommand("cl_draweffectrings", drawrings)
 		end)
 	end
 	if lampbbox == 0 then
-		timer.Simple(0, function()
+		timer.Simple(0.02, function()
 			print("Restoring softlamps_bbox...")
 			RunConsoleCommand("softlamps_bbox", lampbbox)
 		end)
 	end
+	print("If the game is paused, unpause it to start the lightbounce calculation")
 
 end)
 
 concommand.Add("reflection_fidelity_helper",function(Ply, Cmd, Args)
 	local F = tonumber(Args[1])
 	if F then
-		if F > 1 || F < 0 then
+		if F > 1 or F < 0 then
 			F = math.Clamp(F, 0, 1)
 			print("Fidelity must be within 0-1 range. Clamping.")
 			print("")
@@ -386,7 +412,7 @@ hook.Add("HUDPaint", "Show Debug", function()
 end)
 
 concommand.Add("lightbounce_debug_size",function(Ply, Cmd, Args)
-	if isnumber(Args[1]) then
+	if tonumber(Args[1]) then
 		spriteSize = Args[1]
 	end
 end)
