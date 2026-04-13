@@ -582,6 +582,22 @@ local function StoreProjectedTextures(count)
 	end
 end
 
+local function doFrustrumCheck(lamp, frustrumCheck, viewFrustrum)
+	if not lamp:GetAlwaysRender() and frustrumCheck then
+		local lampFrustrum = frustrum.get({
+			fov_unscaled = lamp:GetLightFOV(),
+			origin = lamp:LocalToWorld(lamp:GetLightOffset()),
+			angles = lamp:GetAngles(),
+			znear = lamp:GetNearZ(),
+			zfar = lamp:GetFarZ(),
+			aspect = 1,
+		})
+		if not frustrum.intersectsFrustrum(viewFrustrum, lampFrustrum) then return false end
+	end
+
+	return true
+end
+
 local function SoftPoster(postermul, split)
 --	local extra = extraframes:GetInt()
 	local callsleft = postermul * postermul --+ extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
@@ -605,17 +621,7 @@ local function SoftPoster(postermul, split)
 	local lightcount = 0
 	for k, lamp in pairs(softlamps) do
 		if !lamp:GetHeavyOn() then continue end
-		if not lamp:GetAlwaysRender() and frustrumCheck then
-			local lampFrustrum = frustrum.get({
-				fov_unscaled = lamp:GetLightFOV(),
-				origin = lamp:LocalToWorld(lamp:GetLightOffset()),
-				angles = lamp:GetAngles(),
-				znear = lamp:GetNearZ(),
-				zfar = lamp:GetFarZ(),
-				aspect = 1,
-			})
-			if not frustrum.intersectsFrustrum(viewFrustrum, lampFrustrum) then continue end
-		end
+		if not doFrustrumCheck(lamp, frustrumCheck, viewFrustrum) then continue end
 
 		local c = lamp:HeavyLightCount()
 		lightcount = lightcount + c
@@ -738,17 +744,7 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 	local lightcount = 0
 	for k, lamp in pairs(softlamps) do
 		if !lamp:GetHeavyOn() then continue end
-		if not lamp:GetAlwaysRender() and frustrumCheck then
-			local lampFrustrum = frustrum.get({
-				fov_unscaled = lamp:GetLightFOV(),
-				origin = lamp:LocalToWorld(lamp:GetLightOffset()),
-				angles = lamp:GetAngles(),
-				znear = lamp:GetNearZ(),
-				zfar = lamp:GetFarZ(),
-				aspect = 1,
-			})
-			if not frustrum.intersectsFrustrum(viewFrustrum, lampFrustrum) then continue end
-		end
+		if not doFrustrumCheck(lamp, frustrumCheck, viewFrustrum) then continue end
 
 		local c = lamp:HeavyLightCount()
 		lightcount = lightcount + c
