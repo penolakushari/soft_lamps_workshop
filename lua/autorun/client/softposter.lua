@@ -15,6 +15,11 @@ local attenuations = {
 }
 cvars.AddChangeCallback("poster_lightbounce_attenuation", function (convar, oldValue, newValue)
 	if not attenuations[newValue] then
+		MsgN("Given setting ", newValue, " is not valid!")
+		MsgN("Lightbounce attenuations:")
+		MsgN("- constant")
+		MsgN("- linear")
+		MsgN("- quadratic")
 		-- Revert the convar to quadratic if the new convar isn't valid
 		return lightattenuation:Revert()
 	end
