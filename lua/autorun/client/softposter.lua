@@ -1,6 +1,33 @@
+---@module "softlamps.client.frustrum"
+local frustrum = include("softlamps/client/frustrum.lua")
+
 --print("\tIF YOU SEE THIS TELL NEATNIT!! SoftPoster just got loaded!")
 --local extraframes = CreateClientConVar("poster_extraframes", "0")
 local lampcount = CreateClientConVar("poster_uselampcount", "1", true, false, "Soft Lamps: Amount of lamps to enable during 1 render tick", 1, 8)
+local checkfrustrum = CreateClientConVar("poster_checkfrustrum", "0", true, false, "Soft Lamps: Check if the view frustrum intersects with lamp frustrum. Expensive on initialization but may potentially result in less render time", 0, 1)
+local checkfrustrum_farz = CreateClientConVar("poster_checkfrustrum_farz", "-1", true, false, "Soft Lamps: Override farz for frustrum checks", -1)
+local lightattenuation = CreateClientConVar("poster_lightbounce_attenuation", "quadratic", true, false, "Soft Lamps: Set the attenuation for lightbounces\n\t- quadratic\n\t- linear\n\t- constant")
+local lightbounce_skip = CreateClientConVar("poster_lightbounce_skip", "0", true, false, "Soft Lamps: Specify lightbounces to skip renders. 2 means skip every other bounce, and 3 means skip every 3rd bounce", 0)
+local attenuations = {
+	quadratic = true,
+	linear = true,
+	constant = true,
+}
+cvars.AddChangeCallback("poster_lightbounce_attenuation", function (convar, oldValue, newValue)
+	if not attenuations[newValue] then
+		MsgN("Given setting ", newValue, " is not valid!")
+		MsgN("Lightbounce attenuations:")
+		MsgN("- constant")
+		MsgN("- linear")
+		MsgN("- quadratic")
+		-- Revert the convar to quadratic if the new convar isn't valid
+		return lightattenuation:Revert()
+	end
+end)
+
+local function matchAttenuation(attenuation, target)
+	return attenuation == target and 1 or 0
+end
 
 local tex_render = render.GetSuperFPTex()
 local tex_blend  = render.GetSuperFPTex2()
@@ -276,7 +303,7 @@ local colormod2 = {
 function SingleRender(ent, progressbardata, fuckshit, camstarter)
 	renders = renders + 1
 
-	//if renders == 1 or fuckshit then RenderZBuffer() end	-- render depth buffer on first render
+	--if renders == 1 or fuckshit then RenderZBuffer() end	-- render depth buffer on first render
 	RenderZBuffer()
 
 	cam.Start(camstarter)
@@ -542,18 +569,65 @@ local function AbortTimePredict(limit, starttime, alllights, curlight)
 	return false
 end
 
+local function StoreProjectedTextures(count)
+	---@type ProjectedTexture[]
+	local pts = {}
+	for _ = 1, count do
+		local pt = ProjectedTexture()
+		pt:SetBrightness(0)
+		pt:SetFOV(0)
+		pt:Update()
+		table.insert(pts, pt)
+	end
+
+	return pts, function()
+		for _, pt in ipairs(pts) do
+			pt:Remove()
+		end
+	end
+end
+
+local function doFrustrumCheck(lamp, frustrumCheck, viewFrustrum)
+	if not lamp:GetAlwaysRender() and frustrumCheck then
+		local lampFrustrum = frustrum.get({
+			fov_unscaled = lamp:GetLightFOV(),
+			origin = lamp:LocalToWorld(lamp:GetLightOffset()),
+			angles = lamp:GetAngles(),
+			znear = lamp:GetNearZ(),
+			zfar = lamp:GetFarZ(),
+			aspect = 1,
+		})
+		if not frustrum.intersectsFrustrum(viewFrustrum, lampFrustrum) then return false end
+	end
+
+	return true
+end
+
 local function SoftPoster(postermul, split)
 --	local extra = extraframes:GetInt()
 	local callsleft = postermul * postermul --+ extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
 	local starttime = SysTime()	-- benchmarking + feedback
 	local timelimit, predicttime = Abort_TimeVar:GetFloat(), Abort_PredictTimeVar:GetBool()
 
+	---@type {[gmod_softlamp]: integer}
 	local lights = {}
+	---@type gmod_softlamp[]
 	local softlamps = ents.FindByClass("gmod_softlamp")
+	local frustrumCheck = checkfrustrum:GetBool()
+	local frustrumFarZ = checkfrustrum_farz:GetFloat()
+
+	local viewFrustrum
+	if frustrumCheck then
+		local view = render.GetViewSetup()
+		view.zfar = frustrumFarZ > 0 and frustrumFarZ or view.zfar
+		viewFrustrum = frustrum.get(view)
+	end
 
 	local lightcount = 0
 	for k, lamp in pairs(softlamps) do
 		if !lamp:GetHeavyOn() then continue end
+		if not doFrustrumCheck(lamp, frustrumCheck, viewFrustrum) then continue end
+
 		local c = lamp:HeavyLightCount()
 		lightcount = lightcount + c
 		lights[lamp] = c
@@ -589,11 +663,13 @@ local function SoftPoster(postermul, split)
 
 	local abort = false
 
+	local lampc = lampcount:GetInt()
+	if lampc < 1 then lampc = 1 end
+	
+	local pts, removePTs = StoreProjectedTextures(lampc)
+
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
-
-		local lampc = lampcount:GetInt()
-		if lampc < 1 then lampc = 1 end
 
 		i = 0
 
@@ -604,11 +680,11 @@ local function SoftPoster(postermul, split)
 		for lamp, brightness in pairs(lights) do
 			if abort then break end
 
-			lamp:HeavyLightStart(brightness, lampc)
+			lamp:HeavyLightStart(brightness, nil, nil, pts)
 			local lightc = lamp:HeavyLightCount()
 			local lightadd = 0
 
-			while lamp:HeavyLightTick() do
+			while lamp:HeavyLightTick(nil, pts) do
 				if (timelimit > 0) and not abort then
 					abort = AbortTime(timelimit, starttime)
 				end
@@ -624,11 +700,17 @@ local function SoftPoster(postermul, split)
 			end
 			i = i + lightadd
 		end
+		-- Still capture something if we don't have any soft lamps
+		if i == 0 then
+			DoRender(progressbar)
+		end
 		FinishRender()
 
 		callsleft = callsleft - 1
 		if (callsleft <= 0) then
 			hook.Remove("RenderScene","SoftPoster")
+
+			removePTs()
 
 			local endtime = SysTime()
 			print("Poster finished with the following values:")
@@ -637,10 +719,10 @@ local function SoftPoster(postermul, split)
 			print("", "Additive: ", additive or false)
 			print("", "Anti-Aliasing: ", antialias)
 		end
-
+		
 		return true
 	end)
-
+	
 	RunConsoleCommand("poster", postermul, split)
 end
 
@@ -650,12 +732,25 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 	local starttime = SysTime()	-- benchmarking + feedback
 	local timelimit, predicttime = Abort_TimeVar:GetFloat(), Abort_PredictTimeVar:GetBool()
 
+	---@type {[gmod_softlamp]: integer}
 	local lights = {}
+	---@type gmod_softlamp[]
 	local softlamps = ents.FindByClass("gmod_softlamp")
+	local frustrumCheck = checkfrustrum:GetBool()
+	local frustrumFarZ = checkfrustrum_farz:GetFloat()
+
+	local viewFrustrum
+	if frustrumCheck then
+		local view = render.GetViewSetup()
+		view.zfar = frustrumFarZ > 0 and frustrumFarZ or view.zfar
+		viewFrustrum = frustrum.get(view)
+	end
 
 	local lightcount = 0
 	for k, lamp in pairs(softlamps) do
 		if !lamp:GetHeavyOn() then continue end
+		if not doFrustrumCheck(lamp, frustrumCheck, viewFrustrum) then continue end
+
 		local c = lamp:HeavyLightCount()
 		lightcount = lightcount + c
 		lights[lamp] = c
@@ -691,11 +786,13 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 
 	local abort = false
 
+	local lampc = lampcount:GetInt()
+	if lampc < 1 then lampc = 1 end
+
+	local pts, removePTs = StoreProjectedTextures(lampc)
+
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
-
-		local lampc = lampcount:GetInt()
-		if lampc < 1 then lampc = 1 end
 
 		i = 0
 
@@ -706,11 +803,11 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 		for lamp, brightness in pairs(lights) do
 			if abort then break end
 
-			lamp:HeavyLightStart(brightness, lampc)
+			lamp:HeavyLightStart(brightness, nil, nil, pts)
 			local lightc = lamp:HeavyLightCount()
 			local lightadd = 0
 
-			while lamp:HeavyLightTick() do
+			while lamp:HeavyLightTick(nil, pts) do
 				if (timelimit > 0) and not abort then
 					abort = AbortTime(timelimit, starttime)
 				end
@@ -726,11 +823,17 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 			end
 			i = i + lightadd
 		end
+		-- Still capture something if we don't have any soft lamps
+		if i == 0 then
+			DoRenderV2(progressbar)
+		end
 		FinishRenderV2()
 
 		callsleft = callsleft - 1
 		if (callsleft <= 0) then
 			hook.Remove("RenderScene","SoftPoster")
+
+			removePTs()
 
 			local endtime = SysTime()
 			print("Poster finished with the following values:")
@@ -742,7 +845,7 @@ local function SoftPosterV2(postermul, split) -- V2 versions of these things exi
 
 		return true
 	end)
-
+	
 	RunConsoleCommand("poster", postermul, split)
 end
 
@@ -811,6 +914,8 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 		}
 	}
 
+	local pts, removePTs = StoreProjectedTextures(1)
+
 	local i = 0
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 --[[		if extra > 0 then
@@ -828,10 +933,10 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 		local j = 0
 
 		for lamp, brightness in pairs(lights) do
-			lamp:HeavyLightStart(brightness, nil, godrays, passes)
+			lamp:HeavyLightStart(brightness, godrays, passes, pts)
 			j = j + 1
 
-			local cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles)
+			local cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles, pts)
 			local lastpass = 1
 			while cont do
 				progressbar[2].progress = j + vlpass-1
@@ -844,7 +949,7 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 				SingleRender(vlp, progressbar, vlpindex == 1, camstarts[i])
 				-- DoRender(progressbar)
 
-				cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles)
+				cont, vlp, vlpindex, vlpass = lamp:HeavyLightTick(ViewAngles, pts)
 				lastpass = vlpass or lastpass
 			end
 			j = j + lastpass-1
@@ -854,6 +959,8 @@ local function GodRaysPoster(godrays, postermul, passes, split, shapemem)
 		callsleft = callsleft - 1
 		if (callsleft <= 0) then
 			hook.Remove("RenderScene", "SoftPoster")
+
+			removePTs()
 
 			local endtime = SysTime()
 			print("Poster finished with the following values:")
@@ -881,7 +988,7 @@ local function InternalConCommand(ply, cmd, args)
 end
 
 concommand.Add("poster_soft", function(ply, cmd, args)
-	//antialias = false
+	--antialias = false
 	if #args < 1 then
 		print("poster_soft <poster size> <poster split>")
 		return
@@ -891,7 +998,7 @@ concommand.Add("poster_soft", function(ply, cmd, args)
 end)--, nil, nil, FCVAR_SPONLY)
 
 concommand.Add("poster_soft_v2", function(ply, cmd, args)
-	//antialias = false
+	--antialias = false
 	if #args < 1 then
 		print("poster_soft_v2 <poster size> <poster split>")
 		return
@@ -934,6 +1041,17 @@ it? hope it  works  and  hope
 it looks awesome :D
 --]]---------------------------
 
+hook.Remove("PreDrawEffects", "DrawFrustrum")
+-- hook.Add("PreDrawEffects", "DrawFrustrum", function()
+-- 	local viewsetup = render.GetViewSetup()
+-- 	viewsetup.zfar = checkfrustrum_farz:GetFloat() > 0 and checkfrustrum_farz:GetFloat() or viewsetup.zfar
+-- 	local view = frustrum.get(viewsetup)
+-- 	for key, center in pairs(view.centers) do
+-- 		debugoverlay.Axis(center, view.planes[key]:Angle(), checkfrustrum_farz:GetFloat(), 0.2, true)
+-- 	end
+-- end)
+
+hook.Remove("RenderScene","SoftPoster")
 local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul, split, depthres )
 --	local extra = extraframes:GetInt()
 	local callsleft = postermul * postermul --+ extra	-- number of calls of the render hook that need to be hooked, sometimes 1 extra called pre-poster for some reason (not always?)
@@ -977,19 +1095,31 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 	lightsize = lightsize + 0
 	for _, pt in pairs(PTs) do
 		pt:SetTexture("effects/flashlight/square")--"models/debug/debugwhite")
-		pt:SetColor(Color(255, 255, 0))
-		pt:SetBrightness((lightbright + 0)/lightpasses)	// +0 to convert from string to number
+		pt:SetColor(Color(0, 0, 0))
+		pt:SetBrightness((lightbright + 0)/lightpasses)	-- +0 to convert from string to number
 		pt:SetEnableShadows(true)
 		pt:SetNearZ(GlobalNearZ)
-		pt:SetFarZ(lightsize + 0)	// +0 to convert from string to number
+		pt:SetFarZ(lightsize + 0)	-- +0 to convert from string to number
 		pt:SetFOV(98.5)	-- works well with effects/flashlight/square IIRC
 
 		-- Set proper attenuation
-		pt:SetConstantAttenuation(0)
-		pt:SetLinearAttenuation(0)
-		pt:SetQuadraticAttenuation(lightsize)
+		pt:SetConstantAttenuation(matchAttenuation(lightattenuation:GetString(), "constant") * lightsize)
+		pt:SetLinearAttenuation(matchAttenuation(lightattenuation:GetString(), "linear") * lightsize)
+		pt:SetQuadraticAttenuation(matchAttenuation(lightattenuation:GetString(), "quadratic") * lightsize)
+		pt:Update()
+	end
+	local frustrumCheck = checkfrustrum:GetBool()
+	local frustrumFarZ = checkfrustrum_farz:GetFloat()
+	local skip = lightbounce_skip:GetInt()
+
+	local viewFrustrum
+	if frustrumCheck then
+		local view = render.GetViewSetup()
+		view.zfar = frustrumFarZ > 0 and frustrumFarZ or view.zfar
+		viewFrustrum = frustrum.get(view)
 	end
 
+	local miss = 0
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
 
@@ -1003,6 +1133,13 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 			for _, bounce in pairs(PixTable) do
 				i = i + 1
 				progressbar[2].progress = i
+				if 
+					(frustrumCheck and not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize)) or
+					(skip > 0 and i % skip == 0)
+				then 
+					miss = miss + 1
+					continue
+				end
 
 				for s = 1, lightpasses do
 					if (lightsize/s > 5) then
@@ -1017,6 +1154,10 @@ local function LightBouncePoster( lightsize, lightbright, lightpasses, postermul
 					end
 				end
 			end
+		end
+		-- Still capture something if we don't have any soft lamps
+		if i == miss then
+			DoRender(progressbar)
 		end
 		FinishRender()
 
@@ -1090,19 +1231,31 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 	lightsize = lightsize + 0
 	for _, pt in pairs(PTs) do
 		pt:SetTexture("effects/flashlight/square")--"models/debug/debugwhite")
-		pt:SetColor(Color(255, 255, 0))
-		pt:SetBrightness((lightbright + 0)/lightpasses)	// +0 to convert from string to number
+		pt:SetColor(Color(0, 0, 0))
+		pt:SetBrightness((lightbright + 0)/lightpasses)	-- +0 to convert from string to number
 		pt:SetEnableShadows(true)
 		pt:SetNearZ(GlobalNearZ)
-		pt:SetFarZ(lightsize + 0)	// +0 to convert from string to number
+		pt:SetFarZ(lightsize + 0)	-- +0 to convert from string to number
 		pt:SetFOV(98.5)	-- works well with effects/flashlight/square IIRC
 
 		-- Set proper attenuation
-		pt:SetConstantAttenuation(0)
-		pt:SetLinearAttenuation(0)
-		pt:SetQuadraticAttenuation(lightsize)
+		pt:SetConstantAttenuation(matchAttenuation(lightattenuation:GetString(), "quadratic") * lightsize)
+		pt:SetLinearAttenuation(matchAttenuation(lightattenuation:GetString(), "quadratic") * lightsize)
+		pt:SetQuadraticAttenuation(matchAttenuation(lightattenuation:GetString(), "quadratic") * lightsize)
+		pt:Update()
+	end
+	local frustrumCheck = checkfrustrum:GetBool()
+	local frustrumFarZ = checkfrustrum_farz:GetFloat()
+	local skip = lightbounce_skip:GetInt()
+
+	local viewFrustrum
+	if frustrumCheck then
+		local view = render.GetViewSetup()
+		view.zfar = frustrumFarZ > 0 and frustrumFarZ or view.zfar
+		viewFrustrum = frustrum.get(view)
 	end
 
+	local miss = 0
 	hook.Add("RenderScene", "SoftPoster", function(ViewOrigin, ViewAngles, ViewFOV)
 		progressbar[1].progress = progressbar[1].progress + 1
 
@@ -1116,6 +1269,13 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 			for _, bounce in pairs(PixTable) do
 				i = i + 1
 				progressbar[2].progress = i
+				if 
+					(frustrumCheck and not frustrum.intersectsSphere(viewFrustrum, bounce.Pos, lightsize)) or
+					(skip > 0 and i % skip == 0)
+				then
+					miss = miss + 1 
+					continue 
+				end
 
 				for s = 1, lightpasses do
 					if (lightsize/s > 5) then
@@ -1130,6 +1290,10 @@ local function LightBouncePosterV2( lightsize, lightbright, lightpasses, posterm
 					end
 				end
 			end
+		end
+		-- Still capture something if we don't have any soft lamps
+		if i == miss then
+			DoRenderV2(progressbar)
 		end
 		FinishRenderV2()
 
@@ -1171,7 +1335,7 @@ concommand.Add("poster_lightbounce", function(ply, cmd, args)
 
 	local cvflashlightdepthres = GetConVar("r_flashlightdepthres")
 	local depthres = cvflashlightdepthres:GetInt()
-	if depthres != lightbounce_depthres then
+	if depthres ~= lightbounce_depthres then
 		print("r_flashlightdepthres is "..depthres.." ! Setting it to "..lightbounce_depthres.." ! Don't forget to turn off all lights before doing lightbounce")
 		RunConsoleCommand("r_flashlightdepthres", lightbounce_depthres)
 
@@ -1187,7 +1351,7 @@ concommand.Add("poster_lightbounce_v2", function(ply, cmd, args)
 
 	local cvflashlightdepthres = GetConVar("r_flashlightdepthres")
 	local depthres = cvflashlightdepthres:GetInt()
-	if depthres != lightbounce_depthres then
+	if depthres ~= lightbounce_depthres then
 		print("r_flashlightdepthres is "..depthres.." ! Setting it to "..lightbounce_depthres.." ! Don't forget to turn off all lights before doing lightbounce")
 		RunConsoleCommand("r_flashlightdepthres", lightbounce_depthres)
 

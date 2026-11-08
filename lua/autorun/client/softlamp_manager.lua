@@ -7,6 +7,10 @@ SoftLampPresets = SoftLampPresets or {}
 SoftLampHoveredVar = SoftLampHoveredVar or nil -- Global var shared with sh_softlamp_controller
 local SOFTLAMPS_MNGR_PRESETSLOADED = false
 
+---@module "softlamps.client.state"
+local state = include("softlamps/client/state.lua")
+local getSoftLampState = state.get
+
 -- Load presets from file if not already loaded
 if not SOFTLAMPS_MNGR_PRESETSLOADED then
     if file.Exists("softlamp_presets.txt", "DATA") then
@@ -167,7 +171,7 @@ local function UpdateLampList()
             lampPanel:SetText("") -- No button text
             lampPanel.lampEntity = lamp
             lampPanel.Paint = function(self, w, h)
-                local col = COLOR_HOVER
+                local col = COLOR_HOVER:Lerp(state.colors[getSoftLampState(lamp)], 0.125)
                 if SoftLampManager.editingLamp == lamp then
                     col = COLOR_SELECTED
                 elseif self:IsHovered() then

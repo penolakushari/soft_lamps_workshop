@@ -104,6 +104,9 @@ if CLIENT then
 	language.Add( "tool.softlamp.name",				"Soft Lamps" )
 	language.Add( "tool.softlamp.desc",				"Soft Projected lights" )
 	language.Add( "tool.softlamp.0",				"Click anywhere to create a soft lamp. Click on a soft lamp to update it. Right-click on a lamp or soft lamp to copy its settings. Hold C on a lamp to save as preset, or right-click → 'Save as Preset'." )
+	language.Add( "tool.softlamp.left",				"Spawn a soft lamp or update the aimed soft lamp." )
+	language.Add( "tool.softlamp.right",				"Copy soft lamp or lamp settings." )
+	language.Add( "tool.softlamp.reload",				"Spawn a soft lamp at the player's viewpoint." )
 	language.Add( "tool.softlamp.fov",				"FOV:" )
 	language.Add( "tool.softlamp.distance",			"Distance (Far Z):" )
 	language.Add( "tool.softlamp.nearz",			"Near Z:" )
@@ -129,6 +132,12 @@ if CLIENT then
 	language.Add( "tool.softlamp.presets",			"Presets:" )
 	language.Add( "tool.softlamp.preset_save",		"Save Current as Preset" )
 	language.Add( "tool.softlamp.preset_name",		"Preset Name:" )
+
+	TOOL.Information = {
+		{ name = "left" },
+		{ name = "right" },
+		{ name = "reload" },
+	}
 end
 
 TOOL.Category = "Construction"
@@ -289,6 +298,10 @@ function TOOL:Reload( trace )
 	if ( !self:GetSWEP():CheckLimit( "softlamps" ) ) then return false end
 
 	local lamp = MakeSoftLamp( ply, r, g, b, key, toggle, texture, mdl, fov, distance, nearz, bright, !toggle && on, softshape, softradius, softlayers, { Pos = pos, Angle = ang }, orthoon, orthosize )
+
+	lamp:SetCollisionGroup(COLLISION_GROUP_WORLD)
+	lamp:GetPhysicsObject():EnableMotion(false)
+	lamp:GetPhysicsObject():Sleep()
 
 	undo.Create( "SoftLamp" )
 		undo.AddEntity( lamp )

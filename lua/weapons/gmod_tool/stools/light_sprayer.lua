@@ -9,7 +9,15 @@ TOOL.Name = "Light Sprayer"
 if CLIENT then
 	language.Add( "Tool.light_sprayer.name", "Light Sprayer" )
 	language.Add( "Tool.light_sprayer.desc", "Sprays scanned light!" )
-	language.Add( "Tool.light_sprayer.0",    "'Left Click' to spray, 'Right Click' to delete dispenses, 'Reload' to display scan grid." )
+	-- language.Add( "Tool.light_sprayer.0",    "'Left Click' to spray, 'Right Click' to delete dispenses, 'Reload' to display scan grid." )
+	language.Add( "Tool.light_sprayer.left",    "Spray dispenses." )
+	language.Add( "Tool.light_sprayer.right",    "'Delete dispenses." )
+	language.Add( "Tool.light_sprayer.reload",    "'Display scan grid." )
+	TOOL.Information = {
+		{ name = "left" },
+		{ name = "right" },
+		{ name = "reload" },
+	}
 end
 
 --Tool functions

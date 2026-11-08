@@ -1,3 +1,11 @@
+AddCSLuaFile("softlamps/client/fzy.lua")
+---@module "softlamps.client.fzy"
+local fzy = include("softlamps/client/fzy.lua")
+---@module "softlamps.client.state"
+local state = include("softlamps/client/state.lua")
+
+local getSoftLampState = state.get
+
 ---@class SoftLamp: ENT
 ---@field SetHeavyOn fun(self: SoftLamp, enabled: boolean)
 ---@field GetHeavyOn fun(self: SoftLamp): enabled: boolean
@@ -5,7 +13,8 @@
 ---@field GetOn fun(self: SoftLamp): enabled: boolean
 ---@field hovered boolean
 
-local SOURCE_URL = "https://gist.github.com/vlazed/927cff337255b993c5fab8a0cfd44111"
+local SOURCE_URL = "https://steamcommunity.com/sharedfiles/filedetails/?id=2044112738"
+local SOFTLAMPS_BANDWIDTH = 50 -- softlamps per tick (1000 hz)
 
 GetAllSoftLamps = nil
 local SOFTLAMP_ENTITY = "gmod_softlamp"
@@ -22,19 +31,47 @@ local function wrapNumber(x, min, max)
 	return x == max and x or ((x - min) % d + d) % d + min
 end
 
----@param softlamp SoftLamp
----@return string
-local function getSoftLampState(softlamp)
-	local state = "disabled"
-	if softlamp:GetHeavyOn() and softlamp:GetOn() then
-		state = "enabled"
-	elseif softlamp:GetHeavyOn() then
-		state = "heavylight"
-	elseif softlamp:GetOn() then
-		state = "gameplay"
-	end
+---@class SoftLampData
+---@field LightOffset Vector
+---@field Color Color
+---@field LightColor Vector
+---@field Brightness number
+---@field Model string
+---@field Pos Vector World position
+---@field Ang Angle World angle
+---@field NearZ number
+---@field FarZ number
+---@field FlashlightTexture string
+---@field FocalDistance number Focal point distance
+---@field LightFOV number
+---@field HeavyOn boolean
+---@field ShapeRadius number Heavy light radius
+---@field HeavyShape string Heavy light shape
+---@field HeavyLayers number Heavy light layers
+---@field On boolean
+---@field GameplayShape string Heavy light shape
+---@field GameplayLayers number Heavy light layers
+---@field LinearAttenuation number Linear attenuation
+---@field QuadraticAttenuation number Quadratic attenuation
+---@field ConstantAttenuation number Constant attenuation
+---@field EnableOrthographic boolean
+---@field OrthoLeft number
+---@field OrthoRight number
+---@field OrthoTop number
+---@field OrthoBottom number
 
-	return state
+---@param lamp any
+---@return SoftLampData
+local function getSoftLampData(lamp)
+	local lampData = lamp:GetNetworkVars()
+	local external = {
+		Color = lamp:GetColor(),
+		Pos = lamp:GetPos(),
+		Ang = lamp:GetAngles(),
+		Model = lamp:GetModel()
+	}
+
+	return table.Merge(lampData, external)
 end
 
 local states = {
@@ -70,6 +107,10 @@ local function setSoftLampState(softlamp, state)
 		net.SendToServer()
 	end
 end
+
+local RED = Color(255, 0, 0)
+local YELLOW = Color(255, 255, 0)
+local GREEN = Color(0, 255, 0)
 
 if CLIENT then
 	SoftLampHoveredVar = SoftLampHoveredVar or nil -- This is also defined in Soft Lamp Manager client - to get when we hover over lamp panel
@@ -126,6 +167,49 @@ if CLIENT then
 		return util.TableToJSON(serializedBounce)
 	end
 
+	---@param path string
+	---@param root string
+	local function createDirectoriesFromPath(path, root)
+		local splitPath = string.Split(path, "/")
+		local count = #splitPath
+		if count > 1 then
+			local currentPath = root
+			for i, name in ipairs(splitPath) do
+				currentPath = currentPath .. "/" .. name
+				if i ~= count and not file.Exists(currentPath, "DATA") then
+					file.CreateDir(currentPath)
+				end
+			end
+		end
+	end
+
+	---@param path string
+	---@return string
+	local function parsePathToLoad(path, root)
+		if not string.find(path, root) then
+			path = root .. "/" .. path
+		end
+		if string.GetExtensionFromFilename(path) ~= "txt" then
+			path = path .. ".txt"
+		end
+
+		return path
+	end
+
+	---@param path string
+	---@param root string
+	---@param data string
+	---@return boolean?, string
+	local function writePathToTextFile(path, root, data)
+		if string.GetExtensionFromFilename(path) ~= "txt" then
+			path = path .. ".txt"
+		end
+
+		local fullPath = root .. "/" .. path
+		local success = file.Write(fullPath, data)
+		return success, fullPath
+	end
+
 	local COLOR = FindMetaTable("Color")
 
 	---@param bounceString string
@@ -152,62 +236,112 @@ if CLIENT then
 
 		return arrayPart, hashPart
 	end
-	local rootPath = "softlamps/lightbounce"
-	if not file.Exists("softlamps", "DATA") then
+	local bounceRootPath = "softlamps/lightbounce"
+	local lampsRootPath = "softlamps/lamps"
+	if not file.IsDir("softlamps", "DATA") then
 		file.CreateDir("softlamps")
 	end
-	if not file.Exists(rootPath, "DATA") then
-		file.CreateDir(rootPath)
+	if not file.Exists(bounceRootPath, "DATA") then
+		file.CreateDir(bounceRootPath)
+	end
+	if not file.Exists(lampsRootPath, "DATA") then
+		file.CreateDir(lampsRootPath)
 	end
 
-	local RED = Color(255, 0, 0)
-	local YELLOW = Color(255, 255, 0)
-	local GREEN = Color(0, 255, 0)
+	local function autocomplete(root, cmd, text)
+		local files, dirs = file.Find(root .. "/" .. string.Trim(text) .. "*", "DATA")
+		table.Add(dirs or {}, files or {})
+
+		local text = string.Split(text, "/")
+		local fullDirectory = ""
+		for i = 1, #text - 1 do
+			fullDirectory = fullDirectory .. string.TrimLeft(text[i]) .. "/"
+		end
+		local suggestions = {}
+		for _, result in ipairs(fzy.filter(string.Trim(text[#text]), dirs, false)) do
+			table.insert(suggestions, cmd .. " " .. fullDirectory .. dirs[result[1]])
+		end
+
+		return suggestions
+	end
+
+	local function assertLightbounces()
+		if not next(SoftLampsBounceTable) then
+			MsgC(
+				YELLOW,
+				"No light bounce data exists in the scene. Use the Light Sprayer tool to add data to the scene in order to save it\n"
+			)
+			return false
+		end
+
+		return true
+	end
+
+	concommand.Add("lightbounce_decimate", function (ply, cmd, args, argStr)
+		if not istable(SoftLampsBounceTable) then
+			return
+		end
+
+		local ratio = args[1]
+
+		if not ratio then
+			MsgN("lightbounce_decimate <ratio>")
+			MsgN("<ratio> must be a decimal number between 0 and 1.")
+			MsgN("1 means no change")
+			MsgN("0 means remove all lightbounces")
+			MsgN("0.5 means remove half the lightbounces in the scene")
+			return
+		end
+
+		local result = assertLightbounces()
+		if not result then 
+			return
+		end
+
+		ratio = tonumber(ratio)
+		local count = 0
+		local removeCount = 0
+		for k, lamp in pairs(SoftLampsBounceTable) do
+			for Pix, PixTable in pairs(lamp) do
+				count = count + 1
+				local roll = math.random()
+				if roll < ratio then
+					removeCount = removeCount + 1
+					lamp[Pix] = nil
+				end
+			end
+		end
+
+		MsgN("Removed ", removeCount, " bounces out of ", count)
+	end)
+
 	concommand.Add("lightbounce_save", function(ply, cmd, args, argStr)
 		if not istable(SoftLampsBounceTable) then
 			return
 		end
 
 		if #args == 0 then
-			print("lightbounce_save <savepath>")
-			print("Note that the <savepath> is relative to data/softlamps")
-			print("If the savepath contains slashes, this command will automatically create these directories for you")
+			MsgN("lightbounce_save <savepath>")
+			MsgN("Note that the <savepath> is relative to data/" .. bounceRootPath)
+			MsgN("If the savepath contains slashes, this command will automatically create these directories for you")
 			return
 		end
 
-		if not next(SoftLampsBounceTable) then
-			MsgC(
-				YELLOW,
-				"No light bounce data exists in the scene. Use the Light Sprayer tool to add data to the scene in order to save it\n"
-			)
+		local result = assertLightbounces()
+		if not result then 
 			return
 		end
 
 		local path = tostring(args[1])
-		local splitPath = string.Split(path, "/")
-		local count = #splitPath
-		if count > 1 then
-			local currentPath = rootPath
-			for i, name in ipairs(splitPath) do
-				currentPath = currentPath .. "/" .. name
-				if i ~= count and not file.Exists(currentPath, "DATA") then
-					file.CreateDir(currentPath)
-				end
-			end
-		end
-
-		if string.GetExtensionFromFilename(path) ~= ".txt" then
-			path = path .. ".txt"
-		end
-
-		local fullPath = rootPath .. "/" .. path
-		local data = serializeBounce(SoftLampsBounceTable)
-		local success = file.Write(fullPath, data)
+		createDirectoriesFromPath(path, bounceRootPath)
+		local success, fullPath = writePathToTextFile(path, bounceRootPath, serializeBounce(SoftLampsBounceTable))
 		if success then
 			MsgC(color_white, "Saved to data/", fullPath, "\n")
 		else
 			MsgC(RED, "Failed to write to data/", fullPath, "\n")
 		end
+	end, function (cmd, argStr)
+		return autocomplete(bounceRootPath, cmd, argStr)
 	end)
 
 	concommand.Add("lightbounce_load", function(ply, cmd, args, argStr)
@@ -216,20 +350,15 @@ if CLIENT then
 		end
 
 		if #args == 0 then
-			print("lightbounce_load <loadpath> <append=0>")
-			print("Load lightbounce data from a <loadpath> relative to " .. rootPath)
-			print("By default, this command will remove any lightbounce data in the scene.")
-			print("To add the lightbounce data to any existing lightbounce setup, set <append> to 1.")
+			MsgN("lightbounce_load <loadpath> <append=0>")
+			MsgN("Load lightbounce data from a <loadpath> relative to data/" .. bounceRootPath)
+			MsgN("By default, this command will remove any lightbounce data in the scene.")
+			MsgN("To add the lightbounce data to any existing lightbounce setup, set <append> to 1.")
 			return
 		end
 
 		local loadPath, append = args[1], Either(args[2] ~= nil, tobool(args[2]), false)
-		if not string.find(loadPath, rootPath) then
-			loadPath = rootPath .. "/" .. loadPath
-		end
-		if string.GetExtensionFromFilename(loadPath) ~= ".txt" then
-			loadPath = loadPath .. ".txt"
-		end
+		loadPath = parsePathToLoad(loadPath, bounceRootPath)
 
 		local bounceString = file.Read(loadPath, "DATA")
 		local success, err = pcall(function()
@@ -258,6 +387,73 @@ if CLIENT then
 			MsgC(RED, "Please report this to the following link:")
 			MsgC(RED, SOURCE_URL)
 		end
+	end, function (cmd, argStr)
+		return autocomplete(bounceRootPath, cmd, argStr)
+	end)
+
+	concommand.Add("softlamps_save", function(ply, cmd, args, argStr)
+		if #args == 0 then
+			MsgN("softlamps_save <savepath>")
+			MsgN("Note that the <savepath> is relative to data/" .. lampsRootPath)
+			MsgN("If the savepath contains slashes, this command will automatically create these directories for you")
+			return
+		end
+
+		local softLamps = GetAllSoftLamps()
+
+		if not softLamps[1] then
+			MsgC(
+				YELLOW,
+				"Soft lamps must exist in the scene in order to save it. Spawn a soft lamp and try again\n"
+			)
+			return
+		end
+
+		local data = {}
+		for _, softLamp in ipairs(softLamps) do
+			table.insert(data, getSoftLampData(softLamp))
+		end
+
+		local path = tostring(args[1])
+		createDirectoriesFromPath(path, lampsRootPath)
+		local success, fullPath = writePathToTextFile(path, lampsRootPath, util.TableToJSON(data, true))
+		if success then
+			MsgC(color_white, "Saved to data/", fullPath, "\n")
+		else
+			MsgC(RED, "Failed to write to data/", fullPath, "\n")
+		end
+	end, function (cmd, argStr)
+		return autocomplete(lampsRootPath, cmd, argStr)
+	end)
+
+	concommand.Add("softlamps_load", function(ply, cmd, args, argStr)
+		if not istable(SoftLampsBounceTable) then
+			return
+		end
+
+		if #args == 0 then
+			MsgN("softlamps_load <loadpath> <replace=0>")
+			MsgN("Load lightbounce data from a <loadpath> relative to data/" .. lampsRootPath)
+			MsgN("By default, this command will add soft lamps to the scene.")
+			MsgN("To replace existing soft lamps with the loaded data, set <replace> to 1.")
+			MsgN("Warning: replace cannot be undone")
+			return
+		end
+
+		local loadPath, replace = args[1], Either(args[2] ~= nil, tobool(args[2]), false)
+		loadPath = parsePathToLoad(loadPath, lampsRootPath)
+
+		net.Start("softlamp_load")
+		net.WriteString(loadPath)
+		net.WriteBool(replace)
+		net.SendToServer()
+
+	end, function (cmd, argStr)
+		return autocomplete(lampsRootPath, cmd, argStr)
+	end)
+
+	net.Receive("softlamp_load", function (len, ply)
+		notification.AddLegacy("Finished loading soft lamp scene data", NOTIFY_GENERIC, 3)
 	end)
 
 	local bboxConVar = CreateClientConVar(
@@ -274,12 +470,7 @@ if CLIENT then
 		]]
 	)
 
-	local stateColors = {
-		disabled = Color(128, 128, 128),
-		gameplay = Color(255, 255, 0),
-		heavylight = Color(255, 128, 0),
-		enabled = Color(0, 255, 0),
-	}
+	local stateColors = state.colors
 
 	-- Draw bounding box states
 	hook.Remove("HUDPaint", "softlamps_bbox")
@@ -304,11 +495,142 @@ if CLIENT then
 		cam.End3D()
 	end)
 else
+	---@param data SoftLampData
+	local function spawnLamp(ply, data)
+		local r = data.LightColor.x * 255
+		local g = data.LightColor.y * 255
+		local b = data.LightColor.z * 255
+		local key = GetConVar("softlamp_key"):GetInt()
+		local texture = data.FlashlightTexture
+		local mdl = data.Model
+		local fov = data.LightFOV
+		local distance = data.FarZ
+		local nearz = data.NearZ
+		local bright = data.Brightness
+		local toggle = true
+		local on = false
+		local softradius = data.ShapeRadius
+		local softlayers = math.max(math.floor(data.HeavyLayers), 1)
+		local softshape = data.HeavyShape
+		local orthoon = data.EnableOrthographic
+		local orthosize = data.OrthoLeft
+		local pos, ang = data.Pos, data.Ang
+		
+		local lamp = MakeSoftLamp(
+			ply,
+			r,
+			g,
+			b,
+			key,
+			toggle,
+			texture,
+			mdl,
+			fov,
+			distance,
+			nearz,
+			bright,
+			not toggle and on,
+			softshape,
+			softradius,
+			softlayers,
+			{ Pos = pos, Angle = ang },
+			orthoon,
+			orthosize
+		)
+
+		if not lamp then
+			return
+		end
+
+		---@cast lamp any
+
+		lamp:SetOrthoLeft(data.OrthoLeft)
+		lamp:SetOrthoTop(data.OrthoTop)
+		lamp:SetOrthoRight(data.OrthoRight)
+		lamp:SetOrthoBottom(data.OrthoBottom)
+		lamp:SetOn(data.On)
+		lamp:SetGameplayShape(data.GameplayShape)
+		lamp:SetGameplayLayers(1)
+		lamp:SetLinearAttenuation(data.LinearAttenuation)
+		lamp:SetQuadraticAttenuation(data.QuadraticAttenuation)
+		lamp:SetConstantAttenuation(data.ConstantAttenuation)
+		lamp:SetLightOffset(data.LightOffset)
+
+		lamp:SetColor(data.Color)
+		lamp:SetRenderMode(RENDERMODE_TRANSCOLOR)
+		local po = lamp:GetPhysicsObject()
+		if IsValid(po) then
+			po:EnableMotion(false)
+			po:Sleep()
+			po:EnableCollisions(false)
+		end
+
+		return lamp
+	end
+
 	util.AddNetworkString("softlamp_removed")
 	net.Receive("softlamp_removed", function()
 		local softlamp = net.ReadEntity()
 		if IsValid(softlamp) then
 			softlamp:Remove()
+		end
+	end)
+
+	util.AddNetworkString("softlamp_load")
+	net.Receive("softlamp_load", function (len, ply)
+		local loadPath = net.ReadString()
+		local replace = net.ReadBool()
+
+		local json = file.Read(loadPath, "DATA")
+
+		undo.Create("Soft lamps scene data")
+		undo.SetPlayer(ply)
+		local success, err = pcall(function()
+			if json then
+				---@type SoftLampData[]
+				local lampArray = util.JSONToTable(json)
+				local count = #lampArray
+				if count == 0 then return end
+
+				if replace then
+					for _, softLamp in ipairs(GetAllSoftLamps()) do
+						softLamp:Remove()
+					end
+				end
+
+				local i = 1
+				timer.Create("softlamp_load_batch", 0.001, math.ceil(count / SOFTLAMPS_BANDWIDTH), function()
+					for j = 0, SOFTLAMPS_BANDWIDTH - 1 do
+						local data = lampArray[i + j]
+						if data then
+							local lamp = spawnLamp(ply, data)
+							if lamp then
+								undo.AddEntity(lamp)
+							end
+						end
+					end
+					i = i + SOFTLAMPS_BANDWIDTH
+
+					if i > count then
+						undo.Finish()
+						net.Start("softlamp_load")
+						net.Send(ply)
+					end
+				end)
+			end
+		end)
+
+		if success then
+			MsgC(
+				GREEN,
+				replace and "Successfully replaced the scene with data/" .. loadPath or "Successfully appended data/" .. loadPath,
+				"!\n"
+			)
+		else
+			MsgC(RED, "An error occurred when attempting to load data/", loadPath, "\n", err)
+			MsgC(RED, "Please report this to the following link:")
+			MsgC(RED, SOURCE_URL)
+			undo.Finish()
 		end
 	end)
 
@@ -337,12 +659,12 @@ else
 			softlamp:SetHeavyOn(indextab[i])
 		end
 
-		print("Enabling lamps from " .. index .. " to " .. index + steps-1)
+		MsgN("Enabling lamps from " .. index .. " to " .. index + steps-1)
 		index = wrapNumber(index + steps, 0, softcount)
 	end, nil, "Walk through all softlamps and change their HeavyLight state one at a time.")
 
 	concommand.Add("softlamps_enable", function(_, _, args)
-		if (not args[1]) or not tonumber(args[1]) then print("Input number index for a Soft Lamp to enable") return end
+		if (not args[1]) or not tonumber(args[1]) then MsgN("Input number index for a Soft Lamp to enable") return end
 		local softlamps = GetAllSoftLamps()
 		local softcount = #softlamps
 
@@ -358,6 +680,12 @@ else
 			softlamp:SetHeavyOn(false)
 		end
 	end, nil, "Turn off the heavylights of all soft lamps")
+	
+	concommand.Add("softlamps_torch", function()
+		for _, softlamp in ipairs(GetAllSoftLamps()) do
+			softlamp:SetHeavyOn(true)
+		end
+	end, nil, "Turn on the heavylights of all soft lamps")
 
 	local gameplay = false
 	concommand.Add(
