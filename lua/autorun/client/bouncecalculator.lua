@@ -6,6 +6,28 @@ SoftLampsBounceTable = {}
 
 local MinLight = 5
 
+local renderHooks = {
+	["RenderScene"] = "volumetric_drawdepth"
+}
+
+local function disableRenderHooks()
+	local hookTable = hook.GetTable()
+	local funcs = {}
+	for renderHook, renderId in pairs(renderHooks) do
+		local renderFunc = hookTable[renderHook] and hookTable[renderHook][renderId]
+		if isfunction(renderFunc) then
+			table.insert(funcs, {renderHook, renderId, renderFunc})
+			hook.Remove(renderHook, renderId)
+		end
+	end
+
+	return function()
+		for _, funcInfo in ipairs(funcs) do
+			hook.Add(funcInfo[1], funcInfo[2], funcInfo[3])
+		end
+	end
+end
+
 concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 --	local flashlightdepthres = GetConVar("r_flashlightdepthres"):GetInt()
 	--if flashlightdepthres != 1024 then
@@ -79,6 +101,7 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 												PositionOffset = -tonumber(Args[1])*3
 											}
 
+						local enableRenderHooks = disableRenderHooks()
 						vtrace.DoTrace(TraceTable, function(BounceData)
 
 							SoftLamp:SetNoDraw(false)
@@ -110,7 +133,7 @@ concommand.Add("lightbounce_calculate", function(Ply, Cmd, Args)
 							end
 
 							print("Calculated "..Count.." lights for lamp:", SoftLamp)--, "Sublamp: "..PT)
-
+							enableRenderHooks()
 						end)
 					--end
 				end
@@ -206,7 +229,7 @@ concommand.Add("lightspray_calculate", function(Ply, Cmd, Args)
 								PositionOffset = -tonumber(Args[1])*3,
 								EntireScreen = true
 							}
-
+		local enableRenderHooks = disableRenderHooks()
 		vtrace.DoTrace(TraceTable, function(BounceData)
 
 			ViewEnt:SetNoDraw(false)
@@ -236,6 +259,7 @@ concommand.Add("lightspray_calculate", function(Ply, Cmd, Args)
 				Count = Count + 1
 			end
 			print("Calculated "..Count.." lights for light spray!")
+			enableRenderHooks()
 		end)
 	end
 
@@ -292,6 +316,7 @@ concommand.Add("lightspray_calculate_advanced", function(Ply, Cmd, Args)
 								PositionOffset = tonumber(Args[6]),
 							}
 
+		local enableRenderHooks = disableRenderHooks()
 		vtrace.DoTrace(TraceTable, function(BounceData)
 
 			ViewEnt:SetNoDraw(false)
@@ -321,6 +346,7 @@ concommand.Add("lightspray_calculate_advanced", function(Ply, Cmd, Args)
 				Count = Count + 1
 			end
 			print("Calculated "..Count.." lights for light spray!")
+			enableRenderHooks()
 		end)
 	end
 
